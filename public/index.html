@@ -24,9 +24,19 @@
       <li><a href="#tracker" class="nav-link" data-section="tracker">TRACKER</a></li>
       <li><a href="#members" class="nav-link" data-section="members">MEMBERS</a></li>
     </ul>
-    <div class="nav-status">
-      <span class="status-dot" id="connectionDot"></span>
-      <span id="connectionText">Connecting...</span>
+    <div class="nav-right">
+      <button id="adminBtn" class="btn-admin-nav hidden" title="แผงควบคุมหัวแก๊ง">
+        <span>🛡️</span> ADMIN PANEL
+      </button>
+      <div id="userProfileNav" class="user-profile-nav">
+        <button id="navLoginBtn" class="btn-login-nav">
+          <span>🔑</span> เข้าสู่ระบบ
+        </button>
+      </div>
+      <div class="nav-status">
+        <span class="status-dot" id="connectionDot"></span>
+        <span id="connectionText">Connecting...</span>
+      </div>
     </div>
   </nav>
 
@@ -34,17 +44,20 @@
   <section id="home" class="hero">
     <div class="hero-bg-overlay"></div>
     <div class="hero-content">
-      <div class="hero-badge">🔴 FIVEM GANG</div>
+      <div class="hero-badge">🔴 FIVEM GANG • LOS SANTOS</div>
       <div class="hero-logo-container">
         <div class="hero-logo-glow"></div>
         <img src="img/evisu_logo.jpg" alt="EVISU Logo" class="hero-logo" />
       </div>
       <h1 class="hero-title">EVISU</h1>
       <p class="hero-subtitle">ORGANIZED CRIME SYNDICATE</p>
-      <p class="hero-tagline">ไม่มีใครยิ่งใหญ่กว่าครอบครัว</p>
+      <div class="hero-motto">
+        <p class="motto-en">LIVE BY HONOR FIGHT WITH COURAGE LEAVE NO REGRET</p>
+        <p class="motto-jp">誇り、勇気、悔いなし。</p>
+      </div>
       <div class="hero-stats">
         <div class="stat-card">
-          <span class="stat-number" id="statMembers">0</span>
+          <span class="stat-number" id="statMembers">18</span>
           <span class="stat-label">MEMBERS</span>
         </div>
         <div class="stat-divider">|</div>
@@ -54,7 +67,7 @@
         </div>
         <div class="stat-divider">|</div>
         <div class="stat-card">
-          <span class="stat-number" id="statShops">0</span>
+          <span class="stat-number" id="statShops">8</span>
           <span class="stat-label">LOCATIONS</span>
         </div>
       </div>
@@ -62,12 +75,9 @@
         <a href="#tracker" class="btn-primary">
           <span>📡</span> LIVE TRACKER
         </a>
-        <a href="https://discord.gg/your-invite" target="_blank" class="btn-discord">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.566 18.566 0 0 0-5.487 0 12.36 12.36 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026c.462-.62.874-1.275 1.226-1.963.021-.04.001-.088-.041-.104a13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028z"/>
-          </svg>
-          JOIN DISCORD
-        </a>
+        <button id="heroLoginBtn" class="btn-discord">
+          <span>🔑</span> เข้าสู่ระบบด้วยชื่อ
+        </button>
       </div>
     </div>
     <div class="hero-scroll-hint">
@@ -81,24 +91,36 @@
     <div class="section-header">
       <div class="section-tag">REAL-TIME</div>
       <h2 class="section-title">SHOP TRACKER</h2>
-      <p class="section-desc">กดติ๊กที่ร้านที่คุณกำลังอยู่ — ระบบจะแจ้งเตือนไปยัง Discord ทันที</p>
+      <p class="section-desc">ระบบเช็คชื่อประจำจุดทั้ง 8 ร้าน — อัปเดตสถานะ Real-time พร้อมกันทั้งแก๊ง</p>
+    </div>
+
+    <!-- User Session Banner -->
+    <div id="sessionBanner" class="session-banner">
+      <div class="session-info">
+        <div class="session-avatar" id="sessionAvatar">?</div>
+        <div>
+          <div class="session-label">กำลังเข้าสู่ระบบในชื่อ:</div>
+          <div class="session-user-row">
+            <span class="session-name" id="sessionName">ยังไม่ได้เข้าสู่ระบบ</span>
+            <span class="session-rank" id="sessionRank">Guest</span>
+          </div>
+        </div>
+      </div>
+      <div class="session-actions">
+        <button id="sessionLoginBtn" class="btn-login-small">🔑 ล็อกอิน</button>
+        <button id="sessionLogoutBtn" class="btn-logout-small hidden">🚪 สลับชื่อ</button>
+      </div>
     </div>
 
     <div class="tracker-layout">
       <!-- Left: Check-in Panel -->
       <div class="checkin-panel">
         <div class="panel-header">
-          <span class="panel-title">🏪 เลือกร้านของคุณ</span>
+          <span class="panel-title">🏪 จุดประจำทั้ง 8 ร้าน (กดติ๊กเพื่อ Check-in)</span>
           <div class="live-indicator">
             <span class="live-pulse"></span>
             <span>LIVE</span>
           </div>
-        </div>
-
-        <!-- Username Input -->
-        <div class="username-row">
-          <input type="text" id="usernameInput" class="username-input" placeholder="ชื่อ In-game ของคุณ..." maxlength="30" />
-          <button class="btn-clear-all" id="clearAllBtn" title="ออกจากทุกร้าน">🚪 ออก</button>
         </div>
 
         <!-- Shop List -->
@@ -110,7 +132,7 @@
       <!-- Right: Who's Where -->
       <div class="whoiswhere-panel">
         <div class="panel-header">
-          <span class="panel-title">👥 ใครอยู่ที่ไหน</span>
+          <span class="panel-title">👥 ใครอยู่ที่ไหนตอนนี้</span>
           <span class="online-badge" id="onlineBadge">0 คน</span>
         </div>
 
@@ -118,13 +140,13 @@
           <div class="ww-empty">
             <span>😴</span>
             <p>ยังไม่มีใคร Check-in</p>
-            <small>ใช้ /checkin ใน Discord หรือกดติ๊กด้านซ้าย</small>
+            <small>เข้าสู่ระบบแล้วกดติ๊กเลือกร้านด้านซ้ายได้เลย</small>
           </div>
         </div>
 
         <!-- Activity Log -->
         <div class="activity-log">
-          <div class="activity-log-title">📣 แจ้งเตือนล่าสุด</div>
+          <div class="activity-log-title">📣 กิจกรรมล่าสุด</div>
           <div class="activity-log-list" id="activityLog">
             <div class="activity-empty">รอรับข้อมูล...</div>
           </div>
@@ -138,7 +160,7 @@
     <div class="section-header">
       <div class="section-tag">THE FAMILY</div>
       <h2 class="section-title">MEMBERS</h2>
-      <p class="section-desc">สมาชิกแก๊ง EVISU</p>
+      <p class="section-desc">รายชื่อสมาชิกแก๊ง EVISU ทั้งหมด 18 คน</p>
     </div>
     <div class="members-grid" id="membersGrid"></div>
   </section>
@@ -146,9 +168,96 @@
   <!-- FOOTER -->
   <footer class="footer">
     <div class="footer-logo">EVISU</div>
-    <p class="footer-tagline">Omerta — We don't talk. We act.</p>
+    <p class="footer-tagline">LIVE BY HONOR FIGHT WITH COURAGE LEAVE NO REGRET</p>
     <p class="footer-copy">© 2026 EVISU Gang. All rights reserved. | FiveM Roleplay</p>
   </footer>
+
+  <!-- ── MODAL: LOGIN ── -->
+  <div id="loginModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🔑</span> เข้าสู่ระบบสมาชิกแก๊ง
+        </div>
+        <button class="modal-close" id="closeLoginModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">เลือกชื่อของคุณจากรายชื่อสมาชิกในแก๊ง EVISU เพื่อเริ่มใช้งาน</p>
+        
+        <div class="form-group">
+          <label for="memberSelect">👤 เลือกรายชื่อสมาชิก:</label>
+          <select id="memberSelect" class="form-select">
+            <option value="">-- กรุณาเลือกชื่อของคุณ --</option>
+          </select>
+        </div>
+
+        <!-- Admin PIN field (visible if leader/vice leader is selected) -->
+        <div id="adminPinGroup" class="form-group hidden">
+          <label for="adminPinInput">🛡️ รหัสผ่านแอดมิน (PIN หัว/รองหัว):</label>
+          <input type="password" id="adminPinInput" class="form-input" placeholder="ใส่รหัสผ่านแอดมิน..." />
+          <small class="form-hint">เฉพาะหัวแก๊งและรองหัวแก๊งเท่านั้น</small>
+        </div>
+
+        <div id="loginError" class="form-error hidden"></div>
+
+        <button id="submitLoginBtn" class="btn-submit">เข้าสู่ระบบ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: ADMIN PANEL ── -->
+  <div id="adminModal" class="modal-overlay hidden">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🛡️</span> แผงควบคุมแอดมิน (หัวแก๊ง / รองหัวแก๊ง)
+        </div>
+        <button class="modal-close" id="closeAdminModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="admin-tabs">
+          <button class="admin-tab active" data-tab="active-tab">📍 ตรวจสอบ Check-in</button>
+          <button class="admin-tab" data-tab="add-member-tab">➕ เพิ่มสมาชิก</button>
+          <button class="admin-tab" data-tab="manage-members-tab">👥 จัดการสมาชิก</button>
+        </div>
+
+        <!-- TAB 1: ACTIVE CHECKINS -->
+        <div id="active-tab" class="admin-tab-content active">
+          <div class="admin-action-bar">
+            <span>สมาชิกที่กำลัง Check-in อยู่ทั้งหมด</span>
+            <button id="adminClearAllBtn" class="btn-danger-small">⚠️ รีเซ็ตการ Check-in ทั้งหมด</button>
+          </div>
+          <div id="adminOccupantsList" class="admin-occupants-list">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <!-- TAB 2: ADD MEMBER -->
+        <div id="add-member-tab" class="admin-tab-content">
+          <div class="form-group">
+            <label>ชื่อสมาชิกใหม่:</label>
+            <input type="text" id="newMemberName" class="form-input" placeholder="เช่น Akashi Seijuro" />
+          </div>
+          <div class="form-group">
+            <label>ตำแหน่ง/ยศ:</label>
+            <select id="newMemberRole" class="form-select">
+              <option value="member">สมาชิก</option>
+              <option value="vice_leader">รองหัวแก๊ง (Admin)</option>
+              <option value="leader">หัวแก๊ง (Admin)</option>
+            </select>
+          </div>
+          <button id="adminAddMemberBtn" class="btn-submit">➕ บันทึกสมาชิกใหม่</button>
+        </div>
+
+        <!-- TAB 3: MANAGE MEMBERS -->
+        <div id="manage-members-tab" class="admin-tab-content">
+          <div id="adminMemberList" class="admin-members-list">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast -->
   <div id="toastContainer"></div>

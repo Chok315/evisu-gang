@@ -6,7 +6,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
-const { activeCheckIns, gangMembers, shops } = require('../data/store');
+const { activeCheckIns, gangMembers, shops, ADMIN_PASSWORD } = require('../data/store');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -19,7 +19,7 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling']
 });
 
-// Export io so bot can use it
+// Export io so other modules can use it
 module.exports.io = io;
 
 app.use(cors());
@@ -31,6 +31,110 @@ app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime
 app.get('/ping', (req, res) => res.send('pong'));
 
 // ── API Routes ──────────────────────────────
+
+// Member Login
+app.post('/api/login', (req, res) => {
+  const { memberId, name, pin } = req.body;
+  const member = gangMembers.find(m => m.id === memberId || (name && m.name.toLowerCase() === name.toLowerCase().trim()));
+  if (!member) {
+    return res.status(404).json({ error: 'ไม่พบรายชื่อนี้ในระบบแก๊ง' });
+  }
+
+  // If Admin (หัวแก๊ง / รองหัวแก๊ง), requires PIN
+  if (member.isAdmin) {
+    if (!pin) {
+      return res.json({ requireAdminPin: true, member: { id: member.id, name: member.name, rank: member.rank, role: member.role } });
+    }
+    if (pin !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'รหัสผ่านแอดมิน (PIN) ไม่ถูกต้อง' });
+    }
+  }
+
+  res.json({
+    success: true,
+    user: {
+      id: member.id,
+      name: member.name,
+      rank: member.rank,
+      role: member.role,
+      isAdmin: Boolean(member.isAdmin)
+    }
+  });
+});
+
+// Admin: Force check out user
+app.post('/api/admin/checkout-user', (req, res) => {
+  const { adminPin, targetUserId } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  const prev = activeCheckIns.get(targetUserId);
+  if (prev) {
+    activeCheckIns.delete(targetUserId);
+    io.emit('checkin_update', { type: 'CHECKOUT', userId: targetUserId, userName: prev.userName, prevShop: prev });
+    console.log(`[ADMIN FORCE CHECK-OUT] ${prev.userName} by Admin`);
+  }
+  res.json({ success: true });
+});
+
+// Admin: Clear all check-ins
+app.post('/api/admin/clear-all', (req, res) => {
+  const { adminPin } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  activeCheckIns.clear();
+  io.emit('checkin_update', { type: 'CLEAR_ALL' });
+  console.log('[ADMIN CLEAR ALL] All shop check-ins cleared by Admin');
+  res.json({ success: true });
+});
+
+// Admin: Add member
+app.post('/api/admin/add-member', (req, res) => {
+  const { adminPin, name, rank, role } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'กรุณากรอกชื่อสมาชิก' });
+  }
+
+  const newId = String(Date.now());
+  const isAdm = role === 'leader' || role === 'vice_leader';
+  const newMember = {
+    id: newId,
+    name: name.trim(),
+    rank: rank || (isAdm ? (role === 'leader' ? 'หัวแก๊ง' : 'รองหัวแก๊ง') : 'สมาชิก'),
+    role: role || 'member',
+    isAdmin: isAdm,
+    rankLevel: role === 'leader' ? 5 : (role === 'vice_leader' ? 4 : 1)
+  };
+
+  gangMembers.push(newMember);
+  io.emit('members_update', gangMembers);
+  console.log(`[ADMIN ADD MEMBER] ${newMember.name} (${newMember.rank})`);
+  res.json({ success: true, member: newMember });
+});
+
+// Admin: Remove member
+app.post('/api/admin/remove-member', (req, res) => {
+  const { adminPin, memberId } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  const idx = gangMembers.findIndex(m => m.id === memberId);
+  if (idx !== -1) {
+    const removed = gangMembers.splice(idx, 1)[0];
+    activeCheckIns.delete(memberId);
+    io.emit('members_update', gangMembers);
+    io.emit('checkin_update', { type: 'CHECKOUT', userId: memberId, userName: removed.name });
+    console.log(`[ADMIN REMOVE MEMBER] ${removed.name}`);
+  }
+  res.json({ success: true });
+});
 
 // GET all shops with current occupants
 app.get('/api/shops', (req, res) => {

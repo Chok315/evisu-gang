@@ -17,5 +17,11 @@ console.log('');
 // Start Express server
 startServer();
 
-// Start Discord bot
-startBot();
+// Start Discord bot (if configured)
+if (process.env.DISCORD_TOKEN) {
+  startBot().catch(err => {
+    console.log('  ⚠️ Discord bot disabled:', err.message);
+  });
+} else {
+  console.log('  ℹ️ Discord bot skipped (no DISCORD_TOKEN)');
+}

@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
    EVISU GANG - Official FiveM Gang Web Application
-   Tick-based Shop Check-in & Discord Real-time Sync
+   Member-based Login & Admin Management System
    ═══════════════════════════════════════════════════════════════ */
 
 let socket = null;
@@ -9,11 +9,17 @@ let checkins = [];
 let membersData = [];
 let myCheckedShopId = null;
 
+// User session
+let currentUser = null;
+let adminPin = null;
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initParticles();
   initNavbar();
-  initUsername();
+  initUserSession();
+  initModals();
+  initAdminPanel();
   initSocket();
   loadData();
 });
@@ -77,50 +83,424 @@ function initNavbar() {
 
   const links = document.querySelectorAll('.nav-link');
   links.forEach(l => {
-    l.addEventListener('click', (e) => {
+    l.addEventListener('click', () => {
       links.forEach(x => x.classList.remove('active'));
       l.classList.add('active');
     });
   });
 }
 
-// ── Username Management ──────────────────────────────────────
-function initUsername() {
-  const input = document.getElementById('usernameInput');
-  const clearBtn = document.getElementById('clearAllBtn');
-  if (!input) return;
+// ── User Session & Login ─────────────────────────────────────
+function initUserSession() {
+  try {
+    const saved = localStorage.getItem('evisu_user');
+    if (saved) {
+      currentUser = JSON.parse(saved);
+      adminPin = sessionStorage.getItem('evisu_admin_pin') || null;
+    }
+  } catch (e) {
+    currentUser = null;
+  }
+  updateUserUI();
+}
 
-  const savedName = localStorage.getItem('evisu_username') || '';
-  input.value = savedName;
+function updateUserUI() {
+  const navLoginBtn = document.getElementById('navLoginBtn');
+  const userProfileNav = document.getElementById('userProfileNav');
+  const adminBtn = document.getElementById('adminBtn');
+  const sessionAvatar = document.getElementById('sessionAvatar');
+  const sessionName = document.getElementById('sessionName');
+  const sessionRank = document.getElementById('sessionRank');
+  const sessionLoginBtn = document.getElementById('sessionLoginBtn');
+  const sessionLogoutBtn = document.getElementById('sessionLogoutBtn');
 
-  input.addEventListener('change', () => {
-    const val = input.value.trim();
-    if (val) localStorage.setItem('evisu_username', val);
+  if (currentUser) {
+    // Nav Profile
+    if (userProfileNav) {
+      const initial = (currentUser.name || 'E')[0].toUpperCase();
+      userProfileNav.innerHTML = `
+        <div class="user-badge-nav" title="คลิกเพื่อออกจากระบบ" style="cursor: pointer;" id="navUserBadge">
+          <div class="nav-user-avatar">${initial}</div>
+          <span class="nav-user-name">${escapeHtml(currentUser.name)}</span>
+          <span class="nav-user-rank">${escapeHtml(currentUser.rank || 'สมาชิก')}</span>
+        </div>
+      `;
+      document.getElementById('navUserBadge')?.addEventListener('click', openLogoutConfirm);
+    }
+
+    // Admin button
+    if (adminBtn) {
+      if (currentUser.isAdmin) {
+        adminBtn.classList.remove('hidden');
+      } else {
+        adminBtn.classList.add('hidden');
+      }
+    }
+
+    // Tracker Session Banner
+    if (sessionAvatar) sessionAvatar.textContent = (currentUser.name || 'E')[0].toUpperCase();
+    if (sessionName) sessionName.textContent = currentUser.name;
+    if (sessionRank) {
+      sessionRank.textContent = currentUser.rank || 'สมาชิก';
+      if (currentUser.isAdmin) {
+        sessionRank.className = 'session-rank leader';
+      } else {
+        sessionRank.className = 'session-rank';
+      }
+    }
+
+    sessionLoginBtn?.classList.add('hidden');
+    sessionLogoutBtn?.classList.remove('hidden');
+
+  } else {
+    // Guest
+    if (userProfileNav) {
+      userProfileNav.innerHTML = `
+        <button id="navLoginBtn" class="btn-login-nav">
+          <span>🔑</span> เข้าสู่ระบบ
+        </button>
+      `;
+      document.getElementById('navLoginBtn')?.addEventListener('click', openLoginModal);
+    }
+
+    adminBtn?.classList.add('hidden');
+
+    if (sessionAvatar) sessionAvatar.textContent = '?';
+    if (sessionName) sessionName.textContent = 'ยังไม่ได้เข้าสู่ระบบ';
+    if (sessionRank) {
+      sessionRank.textContent = 'กรุณาเข้าสู่ระบบ';
+      sessionRank.className = 'session-rank';
+    }
+
+    sessionLoginBtn?.classList.remove('hidden');
+    sessionLogoutBtn?.classList.add('hidden');
+  }
+
+  // Update shop checkboxes
+  renderShops();
+}
+
+function openLogoutConfirm() {
+  if (confirm(`คุณต้องการออกจากระบบของ "${currentUser?.name}" หรือไม่?`)) {
+    logoutUser();
+  }
+}
+
+function logoutUser() {
+  currentUser = null;
+  adminPin = null;
+  localStorage.removeItem('evisu_user');
+  sessionStorage.removeItem('evisu_admin_pin');
+  myCheckedShopId = null;
+  updateUserUI();
+  showToast('🚪 ออกจากระบบเรียบร้อย');
+}
+
+// ── Modals: Login & Admin ────────────────────────────────────
+function initModals() {
+  const loginModal = document.getElementById('loginModal');
+  const closeLoginBtn = document.getElementById('closeLoginModal');
+  const sessionLoginBtn = document.getElementById('sessionLoginBtn');
+  const heroLoginBtn = document.getElementById('heroLoginBtn');
+  const sessionLogoutBtn = document.getElementById('sessionLogoutBtn');
+  const memberSelect = document.getElementById('memberSelect');
+  const adminPinGroup = document.getElementById('adminPinGroup');
+  const adminPinInput = document.getElementById('adminPinInput');
+  const submitLoginBtn = document.getElementById('submitLoginBtn');
+  const loginError = document.getElementById('loginError');
+
+  // Trigger login modal
+  sessionLoginBtn?.addEventListener('click', openLoginModal);
+  heroLoginBtn?.addEventListener('click', openLoginModal);
+  closeLoginBtn?.addEventListener('click', () => loginModal?.classList.add('hidden'));
+
+  sessionLogoutBtn?.addEventListener('click', openLogoutConfirm);
+
+  loginModal?.addEventListener('click', (e) => {
+    if (e.target === loginModal) loginModal.classList.add('hidden');
   });
 
-  clearBtn?.addEventListener('click', () => {
-    checkoutCurrent();
+  // When member is selected in dropdown
+  memberSelect?.addEventListener('change', () => {
+    const selectedId = memberSelect.value;
+    const member = membersData.find(m => m.id === selectedId);
+    if (member && member.isAdmin) {
+      adminPinGroup?.classList.remove('hidden');
+      adminPinInput?.focus();
+    } else {
+      adminPinGroup?.classList.add('hidden');
+      if (adminPinInput) adminPinInput.value = '';
+    }
+    if (loginError) loginError.classList.add('hidden');
+  });
+
+  // Submit login
+  submitLoginBtn?.addEventListener('click', async () => {
+    const selectedId = memberSelect?.value;
+    if (!selectedId) {
+      showLoginError('กรุณาเลือกรายชื่อสมาชิก');
+      return;
+    }
+
+    const pin = adminPinInput?.value || '';
+    submitLoginBtn.disabled = true;
+    submitLoginBtn.textContent = 'กำลังตรวจสอบ...';
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: selectedId, pin })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showLoginError(data.error || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+        submitLoginBtn.disabled = false;
+        submitLoginBtn.textContent = 'เข้าสู่ระบบ';
+        return;
+      }
+
+      // Success
+      currentUser = data.user;
+      localStorage.setItem('evisu_user', JSON.stringify(currentUser));
+      if (pin) {
+        adminPin = pin;
+        sessionStorage.setItem('evisu_admin_pin', pin);
+      }
+
+      loginModal?.classList.add('hidden');
+      updateUserUI();
+      showToast(`👋 ยินดีต้อนรับ ${currentUser.name} (${currentUser.rank})`);
+
+      // Sync active check-in
+      const myCheckin = checkins.find(c => c.userId === currentUser.id);
+      myCheckedShopId = myCheckin ? myCheckin.shopId : null;
+      renderShops();
+
+    } catch (err) {
+      showLoginError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      submitLoginBtn.disabled = false;
+      submitLoginBtn.textContent = 'เข้าสู่ระบบ';
+    }
   });
 }
 
-function getMyUsername() {
-  const input = document.getElementById('usernameInput');
-  let name = input ? input.value.trim() : '';
-  if (!name) {
-    name = localStorage.getItem('evisu_username') || 'EVISU Member';
-    if (input) input.value = name;
-  }
-  return name;
+function openLoginModal() {
+  const loginModal = document.getElementById('loginModal');
+  const loginError = document.getElementById('loginError');
+  const adminPinInput = document.getElementById('adminPinInput');
+  if (loginError) loginError.classList.add('hidden');
+  if (adminPinInput) adminPinInput.value = '';
+
+  populateMemberSelect();
+  loginModal?.classList.remove('hidden');
 }
 
-function getMyUserId() {
-  let id = localStorage.getItem('evisu_user_id');
-  if (!id) {
-    id = 'web_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('evisu_user_id', id);
+function showLoginError(msg) {
+  const loginError = document.getElementById('loginError');
+  if (loginError) {
+    loginError.textContent = msg;
+    loginError.classList.remove('hidden');
   }
-  return id;
 }
+
+function populateMemberSelect() {
+  const select = document.getElementById('memberSelect');
+  if (!select) return;
+
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">-- กรุณาเลือกชื่อของคุณ --</option>';
+
+  // Sort by rank: Leader -> Vice Leader -> Members
+  const sorted = [...membersData].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+
+  sorted.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = `${m.name} (${m.rank || 'สมาชิก'})${m.isAdmin ? ' 🛡️' : ''}`;
+    select.appendChild(opt);
+  });
+
+  if (currentVal) select.value = currentVal;
+}
+
+// ── Admin Panel ──────────────────────────────────────────────
+function initAdminPanel() {
+  const adminBtn = document.getElementById('adminBtn');
+  const adminModal = document.getElementById('adminModal');
+  const closeAdminBtn = document.getElementById('closeAdminModal');
+  const clearAllBtn = document.getElementById('adminClearAllBtn');
+  const addMemberBtn = document.getElementById('adminAddMemberBtn');
+
+  adminBtn?.addEventListener('click', () => {
+    if (!currentUser || !currentUser.isAdmin) {
+      showToast('❌ เฉพาะหัวแก๊งและรองหัวแก๊งเท่านั้น');
+      return;
+    }
+    renderAdminOccupants();
+    renderAdminMemberList();
+    adminModal?.classList.remove('hidden');
+  });
+
+  closeAdminBtn?.addEventListener('click', () => adminModal?.classList.add('hidden'));
+
+  adminModal?.addEventListener('click', (e) => {
+    if (e.target === adminModal) adminModal.classList.add('hidden');
+  });
+
+  // Tab switching
+  const tabs = document.querySelectorAll('.admin-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+
+      tab.classList.add('active');
+      const targetId = tab.getAttribute('data-tab');
+      document.getElementById(targetId)?.classList.add('active');
+    });
+  });
+
+  // Admin Clear All
+  clearAllBtn?.addEventListener('click', async () => {
+    if (!confirm('⚠️ ยืนยันการรีเซ็ตการ Check-in ของทุกคนออกจากทุกร้าน?')) return;
+    try {
+      const res = await fetch('/api/admin/clear-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPin: getAdminPin() })
+      });
+      if (res.ok) {
+        showToast('✅ รีเซ็ตการ Check-in ทั้งหมดเรียบร้อย');
+        renderAdminOccupants();
+      } else {
+        showToast('❌ ไม่สามารถทำรายการได้');
+      }
+    } catch (err) {
+      showToast('❌ เกิดข้อผิดพลาด');
+    }
+  });
+
+  // Admin Add Member
+  addMemberBtn?.addEventListener('click', async () => {
+    const nameInput = document.getElementById('newMemberName');
+    const roleSelect = document.getElementById('newMemberRole');
+    const name = nameInput?.value.trim();
+    const role = roleSelect?.value;
+
+    if (!name) {
+      alert('กรุณากรอกชื่อสมาชิก');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/add-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPin: getAdminPin(),
+          name,
+          role,
+          rank: role === 'leader' ? 'หัวแก๊ง' : (role === 'vice_leader' ? 'รองหัวแก๊ง' : 'สมาชิก')
+        })
+      });
+
+      if (res.ok) {
+        showToast(`➕ เพิ่มสมาชิก "${name}" สำเร็จ`);
+        if (nameInput) nameInput.value = '';
+        renderAdminMemberList();
+      } else {
+        showToast('❌ เพิ่มสมาชิกไม่สำเร็จ');
+      }
+    } catch (err) {
+      showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');
+    }
+  });
+}
+
+function getAdminPin() {
+  return adminPin || sessionStorage.getItem('evisu_admin_pin') || prompt('กรุณาใส่รหัสผ่านแอดมิน (PIN):') || '';
+}
+
+function renderAdminOccupants() {
+  const container = document.getElementById('adminOccupantsList');
+  if (!container) return;
+
+  if (!checkins || checkins.length === 0) {
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">ไม่มีสมาชิกที่ Check-in อยู่ในขณะนี้</div>';
+    return;
+  }
+
+  container.innerHTML = checkins.map(c => `
+    <div class="admin-item-row">
+      <div class="admin-item-info">
+        <span class="shop-badge-num">${escapeHtml(c.shopEmoji || '')}</span>
+        <div>
+          <div class="admin-item-name">${escapeHtml(c.userName)}</div>
+          <div class="admin-item-sub">ประจำอยู่ที่: ${escapeHtml(c.shopName)}</div>
+        </div>
+      </div>
+      <button class="btn-danger-small" onclick="adminForceCheckout('${c.userId}')">🚪 เตะออก</button>
+    </div>
+  `).join('');
+}
+
+window.adminForceCheckout = async function(userId) {
+  if (!confirm('ยืนยันให้สมาชิกคนนี้ออกจากร้าน?')) return;
+  try {
+    const res = await fetch('/api/admin/checkout-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPin: getAdminPin(), targetUserId: userId })
+    });
+    if (res.ok) {
+      showToast('✅ สั่ง Check-out เรียบร้อย');
+      renderAdminOccupants();
+    }
+  } catch (err) {
+    showToast('❌ เกิดข้อผิดพลาด');
+  }
+};
+
+function renderAdminMemberList() {
+  const container = document.getElementById('adminMemberList');
+  if (!container) return;
+
+  container.innerHTML = membersData.map(m => `
+    <div class="admin-item-row">
+      <div class="admin-item-info">
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--gold); border: 1px solid var(--glass-border);">
+          ${(m.name || 'E')[0].toUpperCase()}
+        </div>
+        <div>
+          <div class="admin-item-name">${escapeHtml(m.name)}</div>
+          <div class="admin-item-sub">${escapeHtml(m.rank || 'สมาชิก')}${m.isAdmin ? ' 🛡️' : ''}</div>
+        </div>
+      </div>
+      ${m.role !== 'leader' ? `<button class="btn-danger-small" onclick="adminRemoveMember('${m.id}', '${escapeHtml(m.name)}')">ลบ</button>` : '<span style="font-size: 0.75rem; color: var(--gold);">หัวแก๊ง</span>'}
+    </div>
+  `).join('');
+}
+
+window.adminRemoveMember = async function(id, name) {
+  if (!confirm(`ยืนยันการลบสมาชิก "${name}" ออกจากระบบแก๊ง?`)) return;
+  try {
+    const res = await fetch('/api/admin/remove-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPin: getAdminPin(), memberId: id })
+    });
+    if (res.ok) {
+      showToast(`🗑️ ลบสมาชิก "${name}" เรียบร้อย`);
+      renderAdminMemberList();
+    }
+  } catch (err) {
+    showToast('❌ เกิดข้อผิดพลาด');
+  }
+};
 
 // ── Socket.io Connection ─────────────────────────────────────
 function initSocket() {
@@ -139,18 +519,29 @@ function initSocket() {
       socket.on('initial_state', (data) => {
         if (data.shops) shopsData = data.shops;
         if (data.checkins) checkins = data.checkins;
-        if (data.gangMembers) membersData = data.gangMembers;
+        if (data.gangMembers) {
+          membersData = data.gangMembers;
+          populateMemberSelect();
+        }
+        syncMyCheckinState();
         renderAll();
       });
 
       socket.on('checkin_update', (event) => {
         handleCheckinEvent(event);
       });
+
+      socket.on('members_update', (newMembers) => {
+        membersData = newMembers;
+        populateMemberSelect();
+        renderMembers();
+        renderAdminMemberList();
+        animateNum('statMembers', membersData.length);
+      });
     } else {
       setConnStatus(false);
     }
   } catch (err) {
-    console.warn('Socket connection error:', err);
     setConnStatus(false);
   }
 }
@@ -160,6 +551,15 @@ function setConnStatus(connected) {
   const txt = document.getElementById('connectionText');
   if (dot) dot.className = connected ? 'status-dot connected' : 'status-dot disconnected';
   if (txt) txt.textContent = connected ? 'Connected' : 'Offline';
+}
+
+function syncMyCheckinState() {
+  if (currentUser) {
+    const my = checkins.find(c => c.userId === currentUser.id);
+    myCheckedShopId = my ? my.shopId : null;
+  } else {
+    myCheckedShopId = null;
+  }
 }
 
 // ── Load Data via REST API ───────────────────────────────────
@@ -174,25 +574,22 @@ async function loadData() {
 
     if (Array.isArray(sRes) && sRes.length > 0) shopsData = sRes;
     if (Array.isArray(cRes)) checkins = cRes;
-    if (Array.isArray(mRes)) membersData = mRes;
+    if (Array.isArray(mRes)) {
+      membersData = mRes;
+      populateMemberSelect();
+    }
 
     if (stRes) {
-      animateNum('statMembers', stRes.totalMembers || 0);
-      animateNum('statActive', stRes.activeNow || 0);
+      animateNum('statMembers', stRes.totalMembers || membersData.length);
+      animateNum('statActive', stRes.activeNow || checkins.length);
       animateNum('statShops', stRes.totalShops || shopsData.length);
     } else {
-      animateNum('statMembers', membersData.length || 12);
+      animateNum('statMembers', membersData.length);
       animateNum('statActive', checkins.length);
-      animateNum('statShops', shopsData.length || 15);
+      animateNum('statShops', shopsData.length);
     }
 
-    // Check if user is currently checked into a shop
-    const myId = getMyUserId();
-    const myCheckin = checkins.find(c => c.userId === myId);
-    if (myCheckin) {
-      myCheckedShopId = myCheckin.shopId;
-    }
-
+    syncMyCheckinState();
     renderAll();
   } catch (err) {
     console.error('Failed to load API data:', err);
@@ -201,8 +598,11 @@ async function loadData() {
 
 // ── Event Handler ─────────────────────────────────────────────
 function handleCheckinEvent(event) {
-  if (event.type === 'CHECKIN') {
-    // Add or update checkin
+  if (event.type === 'CLEAR_ALL') {
+    checkins = [];
+    myCheckedShopId = null;
+    addActivityLog('out', '⚠️ <strong>แอดมิน</strong> รีเซ็ตการ Check-in ทั้งหมด');
+  } else if (event.type === 'CHECKIN') {
     checkins = checkins.filter(c => c.userId !== event.userId);
     checkins.push({
       userId: event.userId,
@@ -214,17 +614,26 @@ function handleCheckinEvent(event) {
       checkinTime: event.checkinTime
     });
 
-    addActivityLog('in', `${event.shop.emoji} <strong>${escapeHtml(event.userName)}</strong> เข้า ${escapeHtml(event.shop.name)}`);
+    if (currentUser && currentUser.id === event.userId) {
+      myCheckedShopId = event.shop.id;
+    }
+
+    addActivityLog('in', `<span class="shop-badge-num">${event.shop.emoji}</span> <strong>${escapeHtml(event.userName)}</strong> เข้า ${escapeHtml(event.shop.name)}`);
   } else if (event.type === 'CHECKOUT') {
     const prev = checkins.find(c => c.userId === event.userId);
     checkins = checkins.filter(c => c.userId !== event.userId);
-    if (prev) {
-      addActivityLog('out', `🚪 <strong>${escapeHtml(event.userName)}</strong> ออกจาก ${escapeHtml(prev.shopName)}`);
+
+    if (currentUser && currentUser.id === event.userId) {
+      myCheckedShopId = null;
     }
+
+    const sName = prev ? prev.shopName : 'ร้าน';
+    addActivityLog('out', `🚪 <strong>${escapeHtml(event.userName || 'สมาชิก')}</strong> ออกจาก ${escapeHtml(sName)}`);
   }
 
   animateNum('statActive', checkins.length);
   renderAll();
+  renderAdminOccupants();
 }
 
 // ── Render All ────────────────────────────────────────────────
@@ -240,16 +649,16 @@ function renderShops() {
   if (!container) return;
 
   if (!shopsData || shopsData.length === 0) {
-    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">กำลังโหลดรายชื่อร้าน...</div>';
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">กำลังโหลดรายชื่อจุดประจำทั้ง 8 ร้าน...</div>';
     return;
   }
 
-  const myId = getMyUserId();
+  const currentId = currentUser ? currentUser.id : null;
 
   container.innerHTML = shopsData.map(shop => {
     const occupants = checkins.filter(c => c.shopId === shop.id || c.shopName === shop.name);
     const isOccupied = occupants.length > 0;
-    const isCheckedByMe = (myCheckedShopId === shop.id) || occupants.some(o => o.userId === myId);
+    const isCheckedByMe = currentId && ((myCheckedShopId === shop.id) || occupants.some(o => o.userId === currentId));
 
     const occupantBadge = isOccupied
       ? `<span class="shop-occupant-count has-people">🔴 ${occupants.length} คน</span>`
@@ -281,8 +690,15 @@ function renderShops() {
 
 // ── Toggle Shop Check-in ──────────────────────────────────────
 async function handleShopToggle(shopId) {
-  const myId = getMyUserId();
-  const myName = getMyUsername();
+  // Check if user is logged in
+  if (!currentUser) {
+    showToast('⚠️ กรุณาเข้าสู่ระบบด้วยชื่อของคุณก่อนกด Check-in ครับ');
+    openLoginModal();
+    return;
+  }
+
+  const myId = currentUser.id;
+  const myName = currentUser.name;
 
   // If already checked in to THIS shop -> Check out
   if (myCheckedShopId === shopId) {
@@ -310,9 +726,7 @@ async function handleShopToggle(shopId) {
     });
 
     if (res.ok) {
-      showToast(`🏪 Check-in สำเร็จ: ${shopName}`);
-    } else {
-      console.warn('Checkin API responded with error');
+      showToast(`🏪 Check-in สำเร็จ: [${shop?.emoji || ''}] ${shopName}`);
     }
   } catch (err) {
     console.error('Checkin network error:', err);
@@ -320,8 +734,10 @@ async function handleShopToggle(shopId) {
 }
 
 async function checkoutCurrent() {
-  const myId = getMyUserId();
-  const myName = getMyUsername();
+  if (!currentUser) return;
+
+  const myId = currentUser.id;
+  const myName = currentUser.name;
   myCheckedShopId = null;
 
   renderShops();
@@ -357,7 +773,7 @@ function renderWhoIsWhere() {
       <div class="ww-empty">
         <span>😴</span>
         <p>ยังไม่มีใคร Check-in</p>
-        <small>พิมพ์ชื่อแล้วกดติ๊กเลือกร้านด้านซ้ายได้เลย</small>
+        <small>เข้าสู่ระบบแล้วกดติ๊กเลือกร้านด้านซ้ายได้เลย</small>
       </div>
     `;
     return;
@@ -386,7 +802,6 @@ function addActivityLog(type, text) {
   const logContainer = document.getElementById('activityLog');
   if (!logContainer) return;
 
-  // Clear "waiting for data" empty message if present
   const empty = logContainer.querySelector('.activity-empty');
   if (empty) empty.remove();
 
@@ -401,7 +816,6 @@ function addActivityLog(type, text) {
 
   logContainer.insertBefore(item, logContainer.firstChild);
 
-  // Keep max 8 items
   while (logContainer.children.length > 8) {
     logContainer.removeChild(logContainer.lastChild);
   }
@@ -417,18 +831,26 @@ function renderMembers() {
     return;
   }
 
-  grid.innerHTML = membersData.map(m => {
-    const checkin = checkins.find(c => c.userId === m.id) || m.currentCheckin;
-    const isOnline = Boolean(checkin || m.status === 'online');
+  // Sort: Leader -> Vice Leader -> Members
+  const sorted = [...membersData].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+
+  grid.innerHTML = sorted.map(m => {
+    const checkin = checkins.find(c => c.userId === m.id);
+    const isOnline = Boolean(checkin);
 
     const locText = checkin
       ? `<div style="color: var(--gold); font-size: 0.75rem; margin-top: 4px;">📍 <span class="shop-badge-num">${escapeHtml(checkin.shopEmoji || '')}</span> ${escapeHtml(checkin.shopName)}</div>`
       : `<div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">😴 ออฟไลน์</div>`;
 
+    const isLeader = m.role === 'leader';
+    const isVice = m.role === 'vice_leader';
+    const borderColor = isLeader ? 'var(--gold)' : (isVice ? 'var(--red)' : (isOnline ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'));
+    const badgeColor = isLeader ? 'background: rgba(201,168,76,0.2); border-color: var(--gold); color: var(--gold-light);' : (isVice ? 'background: rgba(204,0,0,0.2); border-color: var(--red); color: var(--red-light);' : 'background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: var(--text-dim);');
+
     return `
-      <div class="member-card" style="background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; text-align: center; position: relative;">
-        <span class="rank-badge" style="position: absolute; top: 12px; right: 12px; background: rgba(204,0,0,0.2); border: 1px solid var(--red-dark); color: var(--red-light); font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 4px;">${m.rank || 'Member'}</span>
-        <div style="width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; border: 2px solid ${isOnline ? 'var(--red)' : 'var(--text-muted)'}; display: flex; align-items: center; justify-content: center; font-family: var(--font-brand); font-size: 1.4rem; color: var(--gold); background: var(--bg3);">
+      <div class="member-card" style="background: var(--glass); border: 1px solid ${borderColor}; border-radius: var(--radius); padding: 20px; text-align: center; position: relative; transition: var(--transition);">
+        <span class="rank-badge" style="position: absolute; top: 12px; right: 12px; border: 1px solid; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; ${badgeColor}">${escapeHtml(m.rank || 'สมาชิก')}</span>
+        <div style="width: 58px; height: 58px; margin: 0 auto 12px; border-radius: 50%; border: 2px solid ${isOnline ? 'var(--red)' : 'var(--text-muted)'}; display: flex; align-items: center; justify-content: center; font-family: var(--font-brand); font-size: 1.5rem; color: var(--gold); background: var(--bg3); box-shadow: ${isOnline ? '0 0 14px rgba(204,0,0,0.5)' : 'none'};">
           ${(m.name || 'E')[0].toUpperCase()}
         </div>
         <div style="font-weight: 700; font-size: 0.95rem; color: var(--text);">${escapeHtml(m.name)}</div>
@@ -438,21 +860,23 @@ function renderMembers() {
   }).join('');
 }
 
-// ── Helpers ───────────────────────────────────────────────────
+// ── Utils ─────────────────────────────────────────────────────
 function animateNum(elementId, target) {
   const el = document.getElementById(elementId);
   if (!el) return;
-  const start = parseInt(el.textContent) || 0;
-  const diff = target - start;
-  if (diff === 0) return;
 
-  let current = start;
-  const step = diff > 0 ? 1 : -1;
+  const current = parseInt(el.textContent) || 0;
+  if (current === target) return;
+
+  const duration = 400;
+  const step = target > current ? 1 : -1;
+  let cur = current;
+
   const timer = setInterval(() => {
-    current += step;
-    el.textContent = current;
-    if (current === target) clearInterval(timer);
-  }, 25);
+    cur += step;
+    el.textContent = cur;
+    if (cur === target) clearInterval(timer);
+  }, Math.max(15, Math.floor(duration / Math.abs(target - current || 1))));
 }
 
 function escapeHtml(str) {
