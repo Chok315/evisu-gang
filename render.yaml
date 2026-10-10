@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: evisu-gang
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18.20.0
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_GUILD_ID
+        sync: false
+      - key: DISCORD_CHECKIN_CHANNEL_ID
+        sync: false
