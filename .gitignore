@@ -1,0 +1,4 @@
+# ไม่อัพ .env ขึ้น Git เด็ดขาด!
+.env
+node_modules/
+*.log
