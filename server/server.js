@@ -110,10 +110,23 @@ app.post('/api/checkin', (req, res) => {
 
   io.emit('checkin_update', event);
   console.log(`[CHECK-IN] ${userName} → ${shop.emoji} ${shop.name}`);
+
+  // Notify Discord channel
+  try {
+    const { sendCheckinNotification } = require('../bot/bot');
+    const occupants = [];
+    activeCheckIns.forEach((c) => {
+      if (c.shopId === shop.id) occupants.push(c);
+    });
+    sendCheckinNotification(userName, shop, occupants, avatar);
+  } catch (err) {
+    console.error('Discord notify error:', err.message);
+  }
+
   res.json({ success: true, shop });
 });
 
-// POST check-out (called by bot)
+// POST check-out (called by bot or web)
 app.post('/api/checkout', (req, res) => {
   const { userId, userName } = req.body;
   if (!userId) return res.status(400).json({ error: 'Missing userId' });
@@ -124,6 +137,14 @@ app.post('/api/checkout', (req, res) => {
     const event = { type: 'CHECKOUT', userId, userName, prevShop: prev };
     io.emit('checkin_update', event);
     console.log(`[CHECK-OUT] ${userName} ← ${prev.shopEmoji} ${prev.shopName}`);
+
+    // Notify Discord channel
+    try {
+      const { sendCheckoutNotification } = require('../bot/bot');
+      sendCheckoutNotification(userName || prev.userName, prev.shopName, prev.shopEmoji);
+    } catch (err) {
+      console.error('Discord checkout notify error:', err.message);
+    }
   }
 
   res.json({ success: true });

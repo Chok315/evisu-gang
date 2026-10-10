@@ -289,6 +289,57 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
+// ── Direct Notification Functions (Called from Web) ─────
+async function sendCheckinNotification(userName, shop, occupants = [], avatar = null) {
+  try {
+    const channelId = process.env.DISCORD_CHECKIN_CHANNEL_ID;
+    if (!channelId) return;
+    const ch = client.channels.cache.get(channelId);
+    if (!ch) return;
+
+    const memberList = occupants.length > 0
+      ? occupants.map(o => `👤 **${o.userName}**`).join('\n')
+      : `👤 **${userName}**`;
+
+    const embed = new EmbedBuilder()
+      .setColor(0xcc0000)
+      .setAuthor({ name: 'EVISU Gang | CHECK-IN' })
+      .setDescription(`🔴 **${userName}** เข้า **${shop.emoji} ${shop.name}** แล้ว!`)
+      .addFields(
+        { name: '📍 สถานที่', value: `${shop.emoji} ${shop.name}`, inline: true },
+        { name: '🗺️ โซน', value: shop.zone || 'Los Santos', inline: true },
+        { name: `👥 คนที่อยู่ใน ${shop.name} ตอนนี้`, value: memberList }
+      )
+      .setFooter({ text: 'EVISU Gang • FiveM Roleplay' })
+      .setTimestamp();
+
+    if (avatar) embed.setThumbnail(avatar);
+    await ch.send({ embeds: [embed] });
+  } catch (err) {
+    console.error('Error sending checkin to Discord:', err.message);
+  }
+}
+
+async function sendCheckoutNotification(userName, shopName, shopEmoji = '🏪') {
+  try {
+    const channelId = process.env.DISCORD_CHECKIN_CHANNEL_ID;
+    if (!channelId) return;
+    const ch = client.channels.cache.get(channelId);
+    if (!ch) return;
+
+    const embed = new EmbedBuilder()
+      .setColor(0x333333)
+      .setAuthor({ name: 'EVISU Gang | CHECK-OUT' })
+      .setDescription(`🚪 **${userName}** ออกจาก **${shopEmoji} ${shopName}** แล้ว`)
+      .setFooter({ text: 'EVISU Gang • FiveM Roleplay' })
+      .setTimestamp();
+
+    await ch.send({ embeds: [embed] });
+  } catch (err) {
+    console.error('Error sending checkout to Discord:', err.message);
+  }
+}
+
 // ── Start Bot ──────────────────────────────────
 async function startBot() {
   const ok = await registerCommands();
@@ -300,4 +351,9 @@ async function startBot() {
   }
 }
 
-module.exports = { startBot, client };
+module.exports = {
+  startBot,
+  client,
+  sendCheckinNotification,
+  sendCheckoutNotification
+};
