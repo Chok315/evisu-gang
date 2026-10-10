@@ -15,14 +15,14 @@ const gangMembers = [
 
 // Shop definitions - เฉพาะ 8 ร้านตามที่กำหนด
 const shops = [
-  { id: 'mission_row',    name: 'MISSION ROW',    emoji: '🏢', zone: 'Mission Row',    color: '#c0392b' },
-  { id: 'vinewood',       name: 'VINEWOOD',       emoji: '🌟', zone: 'Vinewood',       color: '#f39c12' },
-  { id: 'grove_street',   name: 'GROVE STREET',   emoji: '🌿', zone: 'Grove Street',   color: '#27ae60' },
-  { id: 'el_rancho',      name: 'EL RANCHO',      emoji: '🏭', zone: 'El Rancho',      color: '#e67e22' },
-  { id: 'little_seoul',   name: 'LITTLE SEOUL',   emoji: '🏮', zone: 'Little Seoul',   color: '#9b59b6' },
-  { id: 'vespucci',       name: 'VESPUCCI',       emoji: '🏖️', zone: 'Vespucci',       color: '#3498db' },
-  { id: 'pacific_bluffs', name: 'PACIFIC BLUFFS', emoji: '🌊', zone: 'Pacific Bluffs', color: '#1abc9c' },
-  { id: 'gang_new',       name: 'GANG NEW',       emoji: '⚔️', zone: 'Gang Area',      color: '#e74c3c' },
+  { id: 'mission_row', name: 'MISSION ROW', emoji: '1', zone: 'Mission Row', color: '#c0392b' },
+  { id: 'vinewood', name: 'VINEWOOD', emoji: '2', zone: 'Vinewood', color: '#f39c12' },
+  { id: 'grove_street', name: 'GROVE STREET', emoji: '3', zone: 'Grove Street', color: '#27ae60' },
+  { id: 'el_rancho', name: 'EL RANCHO', emoji: '4', zone: 'El Rancho', color: '#e67e22' },
+  { id: 'little_seoul', name: 'LITTLE SEOUL', emoji: '5', zone: 'Little Seoul', color: '#9b59b6' },
+  { id: 'vespucci', name: 'VESPUCCI', emoji: '6', zone: 'Vespucci', color: '#3498db' },
+  { id: 'pacific_bluffs', name: 'PACIFIC BLUFFS', emoji: '7', zone: 'Pacific Bluffs', color: '#1abc9c' },
+  { id: 'gang_new', name: 'GANG NEW', emoji: '8', zone: 'Gang Area', color: '#e74c3c' },
 ];
 
 module.exports = { activeCheckIns, gangMembers, shops };

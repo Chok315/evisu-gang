@@ -354,7 +354,44 @@ body {
 }
 .shop-row.checked .shop-checkbox-icon { opacity: 1; }
 
-.shop-emoji { font-size: 1.3rem; flex-shrink: 0; }
+.shop-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(201, 168, 76, 0.12);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  color: var(--gold-light);
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.shop-row.checked .shop-emoji {
+  background: rgba(204, 0, 0, 0.25);
+  border-color: rgba(204, 0, 0, 0.6);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(204, 0, 0, 0.3);
+}
+
+.shop-badge-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(201, 168, 76, 0.15);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  color: var(--gold-light);
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-right: 4px;
+}
 
 .shop-info { flex: 1; min-width: 0; }
 .shop-name {

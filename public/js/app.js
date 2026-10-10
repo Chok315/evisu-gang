@@ -374,7 +374,7 @@ function renderWhoIsWhere() {
         ${avatar}
         <div class="ww-info">
           <div class="ww-name">${escapeHtml(c.userName)}</div>
-          <div class="ww-shop">${c.shopEmoji || '🏪'} ${escapeHtml(c.shopName)}</div>
+          <div class="ww-shop"><span class="shop-badge-num">${escapeHtml(c.shopEmoji || '')}</span> ${escapeHtml(c.shopName)}</div>
         </div>
       </div>
     `;
@@ -422,7 +422,7 @@ function renderMembers() {
     const isOnline = Boolean(checkin || m.status === 'online');
 
     const locText = checkin
-      ? `<div style="color: var(--gold); font-size: 0.75rem; margin-top: 4px;">📍 ${checkin.shopEmoji || '🏪'} ${escapeHtml(checkin.shopName)}</div>`
+      ? `<div style="color: var(--gold); font-size: 0.75rem; margin-top: 4px;">📍 <span class="shop-badge-num">${escapeHtml(checkin.shopEmoji || '')}</span> ${escapeHtml(checkin.shopName)}</div>`
       : `<div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">😴 ออฟไลน์</div>`;
 
     return `
