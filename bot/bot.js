@@ -19,8 +19,6 @@ const API_URL = `http://localhost:${process.env.PORT || 3000}`;
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers,
   ]
 });
 
