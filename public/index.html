@@ -220,6 +220,7 @@
           <button class="admin-tab active" data-tab="active-tab">📍 ตรวจสอบ Check-in</button>
           <button class="admin-tab" data-tab="add-member-tab">➕ เพิ่มสมาชิก</button>
           <button class="admin-tab" data-tab="manage-members-tab">👥 จัดการสมาชิก</button>
+          <button class="admin-tab" data-tab="manage-ranks-tab">🎖️ จัดการยศแก๊ง</button>
         </div>
 
         <!-- TAB 1: ACTIVE CHECKINS -->
@@ -252,8 +253,68 @@
 
         <!-- TAB 3: MANAGE MEMBERS -->
         <div id="manage-members-tab" class="admin-tab-content">
+          <div class="admin-action-bar">
+            <span>รายชื่อสมาชิกและยศประจำตัว (คลิกเปลี่ยนยศได้ทันที)</span>
+          </div>
           <div id="adminMemberList" class="admin-members-list">
             <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <!-- TAB 4: MANAGE RANKS -->
+        <div id="manage-ranks-tab" class="admin-tab-content">
+          <div class="admin-subcard">
+            <div class="admin-subcard-title">🎖️ เพิ่มยศใหม่สำหรับแก๊ง</div>
+            <div class="form-group">
+              <label for="newRankName">ชื่อยศใหม่:</label>
+              <input type="text" id="newRankName" class="form-input" placeholder="เช่น เสนาธิการ, ที่ปรึกษา, กัปตัน, มือปืน" />
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="newRankLevel">ระดับความสำคัญ (Level):</label>
+                <select id="newRankLevel" class="form-select">
+                  <option value="5">Level 5 (ระดับสูงสุด - หัวแก๊ง)</option>
+                  <option value="4">Level 4 (ระดับสูงมาก - รองหัวแก๊ง)</option>
+                  <option value="3" selected>Level 3 (ระดับสูง - ผู้คุม / เสนาธิการ / รุ่นใหญ่)</option>
+                  <option value="2">Level 2 (ระดับกลาง - มือปืน / หน่วยลาดตระเวน)</option>
+                  <option value="1">Level 1 (ระดับทั่วไป - สมาชิกแก๊ง)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>สีป้ายยศ (Badge Color):</label>
+                <div class="color-picker-wrap">
+                  <input type="color" id="newRankColorPicker" value="#c9a84c" class="color-picker-native" />
+                  <div class="color-presets" id="colorPresets">
+                    <button type="button" class="color-preset-dot active" data-color="#c9a84c" style="background:#c9a84c;" title="ทอง"></button>
+                    <button type="button" class="color-preset-dot" data-color="#cc0000" style="background:#cc0000;" title="แดง"></button>
+                    <button type="button" class="color-preset-dot" data-color="#e67e22" style="background:#e67e22;" title="ส้ม"></button>
+                    <button type="button" class="color-preset-dot" data-color="#9b59b6" style="background:#9b59b6;" title="ม่วง"></button>
+                    <button type="button" class="color-preset-dot" data-color="#2980b9" style="background:#2980b9;" title="น้ำเงิน"></button>
+                    <button type="button" class="color-preset-dot" data-color="#27ae60" style="background:#27ae60;" title="เขียว"></button>
+                    <button type="button" class="color-preset-dot" data-color="#95a5a6" style="background:#95a5a6;" title="เงิน/เทา"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="custom-checkbox-label">
+                <input type="checkbox" id="newRankIsAdmin" />
+                <span class="checkbox-box"></span>
+                <span>🛡️ ให้สิทธิ์แอดมิน (สามารถเข้าใช้งานแผงควบคุม Admin ด้วย PIN ได้)</span>
+              </label>
+            </div>
+            <div class="preview-rank-row">
+              <span class="preview-title">ตัวอย่างป้ายยศ:</span>
+              <span id="rankBadgePreview" class="rank-badge preview-badge">ตัวอย่างยศ</span>
+            </div>
+            <button id="adminAddRankBtn" class="btn-submit">➕ บันทึกยศใหม่</button>
+          </div>
+
+          <div class="admin-subcard" style="margin-top: 18px;">
+            <div class="admin-subcard-title">📋 รายการยศทั้งหมดในแก๊ง</div>
+            <div id="adminRanksList" class="admin-ranks-list">
+              <!-- Filled by JS -->
+            </div>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ let socket = null;
 let shopsData = [];
 let checkins = [];
 let membersData = [];
+let ranksData = [];
 let myCheckedShopId = null;
 
 // User session
@@ -340,8 +341,10 @@ function initAdminPanel() {
       showToast('❌ เฉพาะหัวแก๊งและรองหัวแก๊งเท่านั้น');
       return;
     }
+    populateRankSelects();
     renderAdminOccupants();
     renderAdminMemberList();
+    renderAdminRanksList();
     adminModal?.classList.remove('hidden');
   });
 
@@ -361,6 +364,14 @@ function initAdminPanel() {
       tab.classList.add('active');
       const targetId = tab.getAttribute('data-tab');
       document.getElementById(targetId)?.classList.add('active');
+
+      if (targetId === 'manage-ranks-tab') {
+        renderAdminRanksList();
+      } else if (targetId === 'manage-members-tab') {
+        renderAdminMemberList();
+      } else if (targetId === 'add-member-tab') {
+        populateRankSelects();
+      }
     });
   });
 
@@ -389,12 +400,14 @@ function initAdminPanel() {
     const nameInput = document.getElementById('newMemberName');
     const roleSelect = document.getElementById('newMemberRole');
     const name = nameInput?.value.trim();
-    const role = roleSelect?.value;
+    const rankId = roleSelect?.value;
 
     if (!name) {
       alert('กรุณากรอกชื่อสมาชิก');
       return;
     }
+
+    const selectedRank = ranksData.find(r => r.id === rankId) || { name: 'สมาชิก', role: 'member' };
 
     try {
       const res = await fetch('/api/admin/add-member', {
@@ -403,27 +416,222 @@ function initAdminPanel() {
         body: JSON.stringify({
           adminPin: getAdminPin(),
           name,
-          role,
-          rank: role === 'leader' ? 'หัวแก๊ง' : (role === 'vice_leader' ? 'รองหัวแก๊ง' : 'สมาชิก')
+          rankId,
+          role: selectedRank.role || selectedRank.id,
+          rank: selectedRank.name
         })
       });
 
       if (res.ok) {
-        showToast(`➕ เพิ่มสมาชิก "${name}" สำเร็จ`);
+        showToast(`➕ เพิ่มสมาชิก "${name}" (${selectedRank.name}) สำเร็จ`);
         if (nameInput) nameInput.value = '';
         renderAdminMemberList();
       } else {
-        showToast('❌ เพิ่มสมาชิกไม่สำเร็จ');
+        const data = await res.json().catch(() => ({}));
+        showToast(`❌ ${data.error || 'เพิ่มสมาชิกไม่สำเร็จ'}`);
       }
     } catch (err) {
       showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');
     }
   });
+
+  // Initialize Rank Management Sub-system
+  initRankManagement();
 }
 
 function getAdminPin() {
   return adminPin || sessionStorage.getItem('evisu_admin_pin') || prompt('กรุณาใส่รหัสผ่านแอดมิน (PIN):') || '';
 }
+
+// ── Rank Management & Helpers ────────────────────────────────
+function getRankInfo(rankName, role) {
+  const found = ranksData.find(r => r.name === rankName || r.id === role || r.role === role);
+  if (found) return found;
+  if (role === 'leader' || rankName === 'หัวแก๊ง') {
+    return { name: 'หัวแก๊ง', rankLevel: 5, color: '#c9a84c', isAdmin: true };
+  }
+  if (role === 'vice_leader' || rankName === 'รองหัวแก๊ง') {
+    return { name: 'รองหัวแก๊ง', rankLevel: 4, color: '#cc0000', isAdmin: true };
+  }
+  return { name: rankName || 'สมาชิก', rankLevel: 1, color: '#95a5a6', isAdmin: false };
+}
+
+function initRankManagement() {
+  const nameInput = document.getElementById('newRankName');
+  const levelSelect = document.getElementById('newRankLevel');
+  const colorPicker = document.getElementById('newRankColorPicker');
+  const presetBtns = document.querySelectorAll('.color-preset-dot');
+  const preview = document.getElementById('rankBadgePreview');
+  const addRankBtn = document.getElementById('adminAddRankBtn');
+  const isAdminCheck = document.getElementById('newRankIsAdmin');
+
+  let currentColor = colorPicker?.value || '#c9a84c';
+
+  function updatePreview() {
+    if (!preview) return;
+    const txt = nameInput?.value.trim() || 'ตัวอย่างยศ';
+    preview.textContent = txt;
+    preview.style.background = `${currentColor}28`;
+    preview.style.borderColor = currentColor;
+    preview.style.color = currentColor;
+  }
+
+  // Color preset buttons
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      presetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentColor = btn.getAttribute('data-color') || '#c9a84c';
+      if (colorPicker) colorPicker.value = currentColor;
+      updatePreview();
+    });
+  });
+
+  // Native color picker
+  colorPicker?.addEventListener('input', (e) => {
+    currentColor = e.target.value;
+    presetBtns.forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-color') === currentColor);
+    });
+    updatePreview();
+  });
+
+  // Name input listener
+  nameInput?.addEventListener('input', updatePreview);
+  updatePreview();
+
+  // Add Rank Button
+  addRankBtn?.addEventListener('click', async () => {
+    const name = nameInput?.value.trim();
+    const rankLevel = parseInt(levelSelect?.value) || 2;
+    const isAdmin = Boolean(isAdminCheck?.checked);
+    const color = currentColor;
+
+    if (!name) {
+      alert('กรุณากรอกชื่อยศ');
+      nameInput?.focus();
+      return;
+    }
+
+    addRankBtn.disabled = true;
+    addRankBtn.textContent = 'กำลังบันทึก...';
+
+    try {
+      const res = await fetch('/api/admin/add-rank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPin: getAdminPin(),
+          name,
+          rankLevel,
+          isAdmin,
+          color
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`🎖️ เพิ่มยศ "${name}" เรียบร้อยแล้ว`);
+        if (nameInput) nameInput.value = '';
+        if (isAdminCheck) isAdminCheck.checked = false;
+        updatePreview();
+        if (data.ranks) ranksData = data.ranks;
+        populateRankSelects();
+        renderAdminRanksList();
+        renderAdminMemberList();
+        renderMembers();
+      } else {
+        alert(data.error || 'เพิ่มยศไม่สำเร็จ');
+      }
+    } catch (err) {
+      showToast('❌ ข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      addRankBtn.disabled = false;
+      addRankBtn.textContent = '➕ บันทึกยศใหม่';
+    }
+  });
+}
+
+function populateRankSelects() {
+  const roleSelect = document.getElementById('newMemberRole');
+  if (!roleSelect) return;
+
+  const currentVal = roleSelect.value;
+  const sorted = [...ranksData].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+
+  roleSelect.innerHTML = sorted.map(r => `
+    <option value="${r.id}">${escapeHtml(r.name)} (Lv.${r.rankLevel})${r.isAdmin ? ' 🛡️' : ''}</option>
+  `).join('');
+
+  if (currentVal && sorted.some(r => r.id === currentVal)) {
+    roleSelect.value = currentVal;
+  }
+}
+
+function renderAdminRanksList() {
+  const container = document.getElementById('adminRanksList');
+  if (!container) return;
+
+  if (!ranksData || ranksData.length === 0) {
+    container.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted);">ไม่พบข้อมูลยศ</div>';
+    return;
+  }
+
+  const sorted = [...ranksData].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+
+  container.innerHTML = sorted.map(r => {
+    const memberCount = membersData.filter(m => m.rank === r.name || m.role === r.role || m.role === r.id).length;
+    const color = r.color || '#c9a84c';
+    const isSystem = Boolean(r.isSystem);
+
+    return `
+      <div class="admin-item-row">
+        <div class="admin-item-info">
+          <span class="rank-badge preview-badge" style="background: ${color}25; border: 1px solid ${color}; color: ${color};">
+            ${escapeHtml(r.name)}
+          </span>
+          <div>
+            <div class="admin-item-name" style="font-size: 0.82rem;">
+              ระดับ Lv.${r.rankLevel} ${r.isAdmin ? '<span style="color: var(--gold); font-size: 0.75rem;">• 🛡️ มีสิทธิ์แอดมิน</span>' : ''}
+            </div>
+            <div class="admin-item-sub">สมาชิกในยศนี้: <strong>${memberCount}</strong> คน</div>
+          </div>
+        </div>
+        ${!isSystem ? `
+          <button class="btn-danger-small" onclick="adminRemoveRank('${r.id}', '${escapeHtml(r.name)}')">🗑️ ลบ</button>
+        ` : `
+          <span style="font-size: 0.72rem; color: var(--text-muted); padding: 4px 8px; background: rgba(255,255,255,0.03); border-radius: 4px;">ยศหลัก</span>
+        `}
+      </div>
+    `;
+  }).join('');
+}
+
+window.adminRemoveRank = async function(rankId, rankName) {
+  if (!confirm(`ยืนยันการลบยศ "${rankName}" ออกจากแก๊ง?\n\n(สมาชิกที่มียศนี้อยู่จะถูกปรับเป็น "สมาชิก" ทั่วไปอัตโนมัติ)`)) return;
+
+  try {
+    const res = await fetch('/api/admin/remove-rank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPin: getAdminPin(), rankId })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`🗑️ ลบยศ "${rankName}" สำเร็จ`);
+      if (data.ranks) ranksData = data.ranks;
+      populateRankSelects();
+      renderAdminRanksList();
+      renderAdminMemberList();
+      renderMembers();
+    } else {
+      alert(data.error || 'ลบยศไม่สำเร็จ');
+    }
+  } catch (err) {
+    showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');
+  }
+};
 
 function renderAdminOccupants() {
   const container = document.getElementById('adminOccupantsList');
@@ -469,21 +677,83 @@ function renderAdminMemberList() {
   const container = document.getElementById('adminMemberList');
   if (!container) return;
 
-  container.innerHTML = membersData.map(m => `
-    <div class="admin-item-row">
-      <div class="admin-item-info">
-        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--gold); border: 1px solid var(--glass-border);">
-          ${(m.name || 'E')[0].toUpperCase()}
+  const sortedMembers = [...membersData].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+
+  container.innerHTML = sortedMembers.map(m => {
+    const isLeader = m.id === '1' || m.role === 'leader';
+    const rankInfo = getRankInfo(m.rank, m.role);
+    const rColor = rankInfo.color || '#c9a84c';
+
+    // Build options for all ranks
+    const rankOptions = ranksData.map(r => {
+      const isSelected = (m.rank === r.name) || (m.role === r.role) || (m.role === r.id);
+      return `<option value="${r.id}" ${isSelected ? 'selected' : ''}>${escapeHtml(r.name)} (Lv.${r.rankLevel})</option>`;
+    }).join('');
+
+    return `
+      <div class="admin-item-row">
+        <div class="admin-item-info">
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; color: ${rColor}; border: 1px solid ${rColor}; flex-shrink: 0;">
+            ${(m.name || 'E')[0].toUpperCase()}
+          </div>
+          <div>
+            <div class="admin-item-name">${escapeHtml(m.name)}</div>
+            <div class="admin-item-sub">
+              <span class="rank-badge preview-badge" style="background: ${rColor}22; border: 1px solid ${rColor}; color: ${rColor}; font-size: 0.65rem; padding: 2px 7px;">
+                ${escapeHtml(m.rank || 'สมาชิก')}
+              </span>
+              ${m.isAdmin ? '<span style="color: var(--gold); font-size: 0.75rem; margin-left: 4px;">🛡️</span>' : ''}
+            </div>
+          </div>
         </div>
-        <div>
-          <div class="admin-item-name">${escapeHtml(m.name)}</div>
-          <div class="admin-item-sub">${escapeHtml(m.rank || 'สมาชิก')}${m.isAdmin ? ' 🛡️' : ''}</div>
+        <div class="admin-member-actions">
+          ${!isLeader ? `
+            <select class="admin-member-rank-select" onchange="adminChangeMemberRank('${m.id}', this.value)" title="เปลี่ยนยศ">
+              ${rankOptions}
+            </select>
+            <button class="btn-danger-small" onclick="adminRemoveMember('${m.id}', '${escapeHtml(m.name)}')" title="ลบสมาชิก">ลบ</button>
+          ` : `
+            <span style="font-size: 0.75rem; color: var(--gold); font-weight: 700; padding: 4px 8px; border: 1px solid var(--gold); border-radius: 4px; background: rgba(201,168,76,0.1);">👑 หัวแก๊งหลัก</span>
+          `}
         </div>
       </div>
-      ${m.role !== 'leader' ? `<button class="btn-danger-small" onclick="adminRemoveMember('${m.id}', '${escapeHtml(m.name)}')">ลบ</button>` : '<span style="font-size: 0.75rem; color: var(--gold);">หัวแก๊ง</span>'}
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
+
+window.adminChangeMemberRank = async function(memberId, rankId) {
+  try {
+    const res = await fetch('/api/admin/update-member-rank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminPin: getAdminPin(),
+        memberId,
+        rankId
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`✅ เปลี่ยนยศสมาชิกสำเร็จ`);
+      // If updating currently logged in user
+      if (currentUser && currentUser.id === memberId) {
+        currentUser.rank = data.member.rank;
+        currentUser.role = data.member.role;
+        currentUser.rankLevel = data.member.rankLevel;
+        currentUser.isAdmin = Boolean(data.member.isAdmin);
+        localStorage.setItem('evisu_user', JSON.stringify(currentUser));
+        updateUserUI();
+      }
+    } else {
+      alert(data.error || 'เปลี่ยนยศไม่สำเร็จ');
+      renderAdminMemberList();
+    }
+  } catch (err) {
+    showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');
+    renderAdminMemberList();
+  }
+};
 
 window.adminRemoveMember = async function(id, name) {
   if (!confirm(`ยืนยันการลบสมาชิก "${name}" ออกจากระบบแก๊ง?`)) return;
@@ -519,6 +789,11 @@ function initSocket() {
       socket.on('initial_state', (data) => {
         if (data.shops) shopsData = data.shops;
         if (data.checkins) checkins = data.checkins;
+        if (data.ranks) {
+          ranksData = data.ranks;
+          populateRankSelects();
+          renderAdminRanksList();
+        }
         if (data.gangMembers) {
           membersData = data.gangMembers;
           populateMemberSelect();
@@ -536,7 +811,16 @@ function initSocket() {
         populateMemberSelect();
         renderMembers();
         renderAdminMemberList();
+        renderAdminRanksList();
         animateNum('statMembers', membersData.length);
+      });
+
+      socket.on('ranks_update', (newRanks) => {
+        ranksData = newRanks;
+        populateRankSelects();
+        renderAdminRanksList();
+        renderAdminMemberList();
+        renderMembers();
       });
     } else {
       setConnStatus(false);
@@ -565,15 +849,20 @@ function syncMyCheckinState() {
 // ── Load Data via REST API ───────────────────────────────────
 async function loadData() {
   try {
-    const [sRes, cRes, mRes, stRes] = await Promise.all([
+    const [sRes, cRes, mRes, rkRes, stRes] = await Promise.all([
       fetch('/api/shops').then(r => r.json()).catch(() => []),
       fetch('/api/checkins').then(r => r.json()).catch(() => []),
       fetch('/api/members').then(r => r.json()).catch(() => []),
+      fetch('/api/ranks').then(r => r.json()).catch(() => []),
       fetch('/api/stats').then(r => r.json()).catch(() => null)
     ]);
 
     if (Array.isArray(sRes) && sRes.length > 0) shopsData = sRes;
     if (Array.isArray(cRes)) checkins = cRes;
+    if (Array.isArray(rkRes) && rkRes.length > 0) {
+      ranksData = rkRes;
+      populateRankSelects();
+    }
     if (Array.isArray(mRes)) {
       membersData = mRes;
       populateMemberSelect();
@@ -842,10 +1131,16 @@ function renderMembers() {
       ? `<div style="color: var(--gold); font-size: 0.75rem; margin-top: 4px;">📍 <span class="shop-badge-num">${escapeHtml(checkin.shopEmoji || '')}</span> ${escapeHtml(checkin.shopName)}</div>`
       : `<div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">😴 ออฟไลน์</div>`;
 
-    const isLeader = m.role === 'leader';
-    const isVice = m.role === 'vice_leader';
-    const borderColor = isLeader ? 'var(--gold)' : (isVice ? 'var(--red)' : (isOnline ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'));
-    const badgeColor = isLeader ? 'background: rgba(201,168,76,0.2); border-color: var(--gold); color: var(--gold-light);' : (isVice ? 'background: rgba(204,0,0,0.2); border-color: var(--red); color: var(--red-light);' : 'background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: var(--text-dim);');
+    const rankInfo = getRankInfo(m.rank, m.role);
+    const rColor = rankInfo.color || '#c9a84c';
+    const isLeader = m.role === 'leader' || rankInfo.rankLevel === 5;
+    const isHighRank = rankInfo.rankLevel >= 4;
+    const borderColor = isLeader
+      ? 'var(--gold)'
+      : (isHighRank
+        ? 'var(--red)'
+        : (isOnline ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'));
+    const badgeColor = `background: ${rColor}25; border-color: ${rColor}; color: ${rColor};`;
 
     return `
       <div class="member-card" style="background: var(--glass); border: 1px solid ${borderColor}; border-radius: var(--radius); padding: 20px; text-align: center; position: relative; transition: var(--transition);">

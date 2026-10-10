@@ -1,6 +1,8 @@
 // ============================================
-// EVISU Gang - Shared Data Store (In-Memory)
+// EVISU Gang - Shared Data Store
 // ============================================
+const fs = require('fs');
+const path = require('path');
 
 // Active check-ins: { userId: { shopId, shopName, userName, avatar, checkinTime } }
 const activeCheckIns = new Map();
@@ -8,27 +10,70 @@ const activeCheckIns = new Map();
 // Admin settings
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'evisu888';
 
-// Official Members list (18 คน)
-const gangMembers = [
-  { id: '1',  name: 'Pup ha Stikez',       rank: 'หัวแก๊ง',     role: 'leader',      isAdmin: true,  rankLevel: 5 },
-  { id: '2',  name: 'Aya Stikez',          rank: 'รองหัวแก๊ง',  role: 'vice_leader', isAdmin: true,  rankLevel: 4 },
-  { id: '3',  name: 'God Yarkhutsuththar', rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '4',  name: 'Ahlong Silk',         rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '5',  name: 'Bank Kamo',           rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '6',  name: 'Bell Wonderboy',      rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '7',  name: 'Bew Bank',            rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '8',  name: 'Chay Kurozaki',       rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '9',  name: 'Chok Valentine',      rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '10', name: 'Fresh Shy',           rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '11', name: 'Gee Skoke',           rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '12', name: 'Joseph Smith',        rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '13', name: 'Lee Genz',            rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '14', name: 'Minato Yuito',        rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '15', name: 'Patt Krapao',         rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '16', name: 'Pink Aurora',         rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '17', name: 'Redroc Stikez',       rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
-  { id: '18', name: 'Zen Mosa',            rank: 'สมาชิก',     role: 'member',      isAdmin: false, rankLevel: 1 },
+// Default Ranks
+const defaultRanks = [
+  { id: 'leader', name: 'หัวแก๊ง', role: 'leader', rankLevel: 5, isAdmin: true, color: '#c9a84c', isSystem: true },
+  { id: 'vice_leader', name: 'รองหัวแก๊ง', role: 'vice_leader', rankLevel: 4, isAdmin: true, color: '#cc0000', isSystem: true },
+  { id: 'senior', name: 'รุ่นใหญ่', role: 'senior', rankLevel: 3, isAdmin: false, color: '#e67e22', isSystem: false },
+  { id: 'member', name: 'สมาชิก', role: 'member', rankLevel: 1, isAdmin: false, color: '#95a5a6', isSystem: true },
 ];
+
+// Default Official Members list (18 คน)
+const defaultMembers = [
+  { id: '1', name: 'Pup ha Stikez', rank: 'หัวแก๊ง', role: 'leader', isAdmin: true, rankLevel: 5 },
+  { id: '2', name: 'Aya Stikez', rank: 'รองหัวแก๊ง', role: 'vice_leader', isAdmin: true, rankLevel: 4 },
+  { id: '3', name: 'God Yarkhutsuththar', rank: 'รองหัวแก๊ง', role: 'vice_leader', isAdmin: true, rankLevel: 4 },
+  { id: '4', name: 'Ahlong Silk', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '5', name: 'Bank Kamo', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '6', name: 'Bell Wonderboy', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '7', name: 'Bew Bank', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '8', name: 'Chay Kurozaki', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '9', name: 'Chok Valentine', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '10', name: 'Fresh Shy', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '11', name: 'Gee Skoke', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '12', name: 'Joseph Smith', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '13', name: 'Lee Genz', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '14', name: 'Minato Yuito', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '15', name: 'Patt Krapao', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '16', name: 'Pink Aurora', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '17', name: 'Redroc Stikez', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+  { id: '18', name: 'Zen Mosa', rank: 'สมาชิก', role: 'member', isAdmin: false, rankLevel: 1 },
+];
+
+const DATA_FILE = path.join(__dirname, 'gang_data.json');
+
+let gangMembers = [...defaultMembers];
+let gangRanks = [...defaultRanks];
+
+function loadData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.members) && parsed.members.length > 0) {
+        gangMembers = parsed.members;
+      }
+      if (Array.isArray(parsed.ranks) && parsed.ranks.length > 0) {
+        gangRanks = parsed.ranks;
+      }
+    } else {
+      saveData();
+    }
+  } catch (err) {
+    console.error('Error loading gang_data.json:', err.message);
+  }
+}
+
+function saveData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ members: gangMembers, ranks: gangRanks }, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving gang_data.json:', err.message);
+  }
+}
+
+// Initial load
+loadData();
 
 // Shop definitions - เฉพาะ 8 ร้านตามที่กำหนด
 const shops = [
@@ -42,4 +87,11 @@ const shops = [
   { id: 'gang_new', name: 'GANG NEW', emoji: '8', zone: 'Gang Area', color: '#e74c3c' },
 ];
 
-module.exports = { activeCheckIns, gangMembers, shops, ADMIN_PASSWORD };
+module.exports = {
+  activeCheckIns,
+  gangMembers,
+  gangRanks,
+  shops,
+  ADMIN_PASSWORD,
+  saveData
+};

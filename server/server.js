@@ -6,7 +6,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
-const { activeCheckIns, gangMembers, shops, ADMIN_PASSWORD } = require('../data/store');
+const { activeCheckIns, gangMembers, gangRanks, shops, ADMIN_PASSWORD, saveData } = require('../data/store');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -40,7 +40,7 @@ app.post('/api/login', (req, res) => {
     return res.status(404).json({ error: 'ไม่พบรายชื่อนี้ในระบบแก๊ง' });
   }
 
-  // If Admin (หัวแก๊ง / รองหัวแก๊ง), requires PIN
+  // If Admin (หัวแก๊ง / รองหัวแก๊ง / custom admin rank), requires PIN
   if (member.isAdmin) {
     if (!pin) {
       return res.json({ requireAdminPin: true, member: { id: member.id, name: member.name, rank: member.rank, role: member.role } });
@@ -57,7 +57,8 @@ app.post('/api/login', (req, res) => {
       name: member.name,
       rank: member.rank,
       role: member.role,
-      isAdmin: Boolean(member.isAdmin)
+      isAdmin: Boolean(member.isAdmin),
+      rankLevel: member.rankLevel || 1
     }
   });
 });
@@ -91,9 +92,121 @@ app.post('/api/admin/clear-all', (req, res) => {
   res.json({ success: true });
 });
 
+// GET all ranks
+app.get('/api/ranks', (req, res) => {
+  const sorted = [...gangRanks].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+  res.json(sorted);
+});
+
+// Admin: Add custom rank (หัวแก๊ง/แอดมินสร้างยศใหม่)
+app.post('/api/admin/add-rank', (req, res) => {
+  const { adminPin, name, rankLevel, isAdmin, color } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'กรุณากรอกชื่อยศ' });
+  }
+
+  const trimmedName = name.trim();
+  if (gangRanks.some(r => r.name.toLowerCase() === trimmedName.toLowerCase())) {
+    return res.status(400).json({ error: `มียศชื่อ "${trimmedName}" ในระบบแล้ว` });
+  }
+
+  const newRank = {
+    id: 'rank_' + Date.now(),
+    name: trimmedName,
+    role: 'custom_' + Date.now(),
+    rankLevel: Math.max(1, Math.min(5, parseInt(rankLevel) || 2)),
+    isAdmin: Boolean(isAdmin),
+    color: color || '#c9a84c',
+    isSystem: false
+  };
+
+  gangRanks.push(newRank);
+  if (typeof saveData === 'function') saveData();
+  io.emit('ranks_update', gangRanks);
+  console.log(`[ADMIN ADD RANK] ${newRank.name} (Lv.${newRank.rankLevel}, Admin: ${newRank.isAdmin})`);
+  res.json({ success: true, rank: newRank, ranks: gangRanks });
+});
+
+// Admin: Remove custom rank
+app.post('/api/admin/remove-rank', (req, res) => {
+  const { adminPin, rankId } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  const rankIndex = gangRanks.findIndex(r => r.id === rankId);
+  if (rankIndex === -1) {
+    return res.status(404).json({ error: 'ไม่พบยศที่ต้องการลบ' });
+  }
+
+  const targetRank = gangRanks[rankIndex];
+  if (targetRank.isSystem) {
+    return res.status(400).json({ error: 'ไม่สามารถลบยศระบบหลักได้ (หัวแก๊ง / รองหัวแก๊ง / สมาชิก)' });
+  }
+
+  // Any member holding this deleted rank falls back to standard member
+  const defaultMemberRank = gangRanks.find(r => r.id === 'member') || { name: 'สมาชิก', role: 'member', rankLevel: 1, isAdmin: false };
+  let updatedAny = false;
+  gangMembers.forEach(m => {
+    if (m.rank === targetRank.name || m.role === targetRank.role || m.role === targetRank.id) {
+      m.rank = defaultMemberRank.name;
+      m.role = defaultMemberRank.role;
+      m.rankLevel = defaultMemberRank.rankLevel;
+      m.isAdmin = defaultMemberRank.isAdmin;
+      updatedAny = true;
+    }
+  });
+
+  gangRanks.splice(rankIndex, 1);
+  if (typeof saveData === 'function') saveData();
+  io.emit('ranks_update', gangRanks);
+  if (updatedAny) {
+    io.emit('members_update', gangMembers);
+  }
+
+  console.log(`[ADMIN REMOVE RANK] ${targetRank.name}`);
+  res.json({ success: true, ranks: gangRanks });
+});
+
+// Admin: Update member rank (เปลี่ยนยศสมาชิก)
+app.post('/api/admin/update-member-rank', (req, res) => {
+  const { adminPin, memberId, rankId } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  const member = gangMembers.find(m => m.id === memberId);
+  if (!member) {
+    return res.status(404).json({ error: 'ไม่พบสมาชิกนี้ในระบบ' });
+  }
+
+  const targetRank = gangRanks.find(r => r.id === rankId || r.name === rankId);
+  if (!targetRank) {
+    return res.status(404).json({ error: 'ไม่พบยศที่ต้องการเปลี่ยน' });
+  }
+
+  // Don't allow changing Supreme leader to something else unless intended
+  if (member.id === '1' && targetRank.id !== 'leader') {
+    return res.status(400).json({ error: 'ไม่สามารถลดหรือเปลี่ยนยศของหัวแก๊งหลักได้' });
+  }
+
+  member.rank = targetRank.name;
+  member.role = targetRank.role || targetRank.id;
+  member.rankLevel = targetRank.rankLevel || 1;
+  member.isAdmin = Boolean(targetRank.isAdmin);
+
+  if (typeof saveData === 'function') saveData();
+  io.emit('members_update', gangMembers);
+  console.log(`[ADMIN UPDATE RANK] ${member.name} -> ${member.rank} (Lv.${member.rankLevel})`);
+  res.json({ success: true, member });
+});
+
 // Admin: Add member
 app.post('/api/admin/add-member', (req, res) => {
-  const { adminPin, name, rank, role } = req.body;
+  const { adminPin, name, rankId, rank, role } = req.body;
   if (adminPin !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
   }
@@ -101,18 +214,23 @@ app.post('/api/admin/add-member', (req, res) => {
     return res.status(400).json({ error: 'กรุณากรอกชื่อสมาชิก' });
   }
 
+  let matchedRank = gangRanks.find(r => r.id === rankId || r.name === rank || r.role === role);
+  if (!matchedRank) {
+    matchedRank = gangRanks.find(r => r.id === 'member') || { name: 'สมาชิก', role: 'member', rankLevel: 1, isAdmin: false };
+  }
+
   const newId = String(Date.now());
-  const isAdm = role === 'leader' || role === 'vice_leader';
   const newMember = {
     id: newId,
     name: name.trim(),
-    rank: rank || (isAdm ? (role === 'leader' ? 'หัวแก๊ง' : 'รองหัวแก๊ง') : 'สมาชิก'),
-    role: role || 'member',
-    isAdmin: isAdm,
-    rankLevel: role === 'leader' ? 5 : (role === 'vice_leader' ? 4 : 1)
+    rank: matchedRank.name,
+    role: matchedRank.role || matchedRank.id,
+    isAdmin: Boolean(matchedRank.isAdmin),
+    rankLevel: matchedRank.rankLevel || 1
   };
 
   gangMembers.push(newMember);
+  if (typeof saveData === 'function') saveData();
   io.emit('members_update', gangMembers);
   console.log(`[ADMIN ADD MEMBER] ${newMember.name} (${newMember.rank})`);
   res.json({ success: true, member: newMember });
@@ -129,6 +247,7 @@ app.post('/api/admin/remove-member', (req, res) => {
   if (idx !== -1) {
     const removed = gangMembers.splice(idx, 1)[0];
     activeCheckIns.delete(memberId);
+    if (typeof saveData === 'function') saveData();
     io.emit('members_update', gangMembers);
     io.emit('checkin_update', { type: 'CHECKOUT', userId: memberId, userName: removed.name });
     console.log(`[ADMIN REMOVE MEMBER] ${removed.name}`);
@@ -263,7 +382,7 @@ io.on('connection', (socket) => {
   activeCheckIns.forEach((checkin, userId) => {
     currentState.push({ userId, ...checkin });
   });
-  socket.emit('initial_state', { checkins: currentState, shops, gangMembers });
+  socket.emit('initial_state', { checkins: currentState, shops, gangMembers, ranks: gangRanks });
 
   socket.on('disconnect', () => {
     console.log(`[WS] Client disconnected: ${socket.id}`);
