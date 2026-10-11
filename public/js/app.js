@@ -469,7 +469,12 @@ function initAdminPanel() {
 }
 
 function getAdminPin() {
-  return adminPin || sessionStorage.getItem('evisu_admin_pin') || prompt('กรุณาใส่รหัสผ่านแอดมิน (PIN):') || '';
+  let pin = adminPin || sessionStorage.getItem('evisu_admin_pin');
+  if (!pin) {
+    pin = prompt('กรุณาใส่รหัสผ่านแอดมิน (PIN):', 'evisu888');
+    if (pin) sessionStorage.setItem('evisu_admin_pin', pin.trim());
+  }
+  return pin ? String(pin).trim() : '';
 }
 
 // ── Rank Management & Helpers ────────────────────────────────
@@ -636,7 +641,7 @@ function renderAdminRanksList() {
   }).join('');
 }
 
-window.adminRemoveRank = async function(rankId, rankName) {
+window.adminRemoveRank = async function (rankId, rankName) {
   if (!confirm(`ยืนยันการลบยศ "${rankName}" ออกจากแก๊ง?\n\n(สมาชิกที่มียศนี้อยู่จะถูกปรับเป็น "สมาชิก" ทั่วไปอัตโนมัติ)`)) return;
 
   try {
@@ -685,7 +690,7 @@ function renderAdminOccupants() {
   `).join('');
 }
 
-window.adminForceCheckout = async function(userId) {
+window.adminForceCheckout = async function (userId) {
   if (!confirm('ยืนยันให้สมาชิกคนนี้ออกจากร้าน?')) return;
   try {
     const res = await fetch('/api/admin/checkout-user', {
@@ -750,7 +755,7 @@ function renderAdminMemberList() {
   }).join('');
 }
 
-window.adminChangeMemberRank = async function(memberId, rankId) {
+window.adminChangeMemberRank = async function (memberId, rankId) {
   try {
     const res = await fetch('/api/admin/update-member-rank', {
       method: 'POST',
@@ -784,7 +789,7 @@ window.adminChangeMemberRank = async function(memberId, rankId) {
   }
 };
 
-window.adminRemoveMember = async function(id, name) {
+window.adminRemoveMember = async function (id, name) {
   if (!confirm(`ยืนยันการลบสมาชิก "${name}" ออกจากระบบแก๊ง?`)) return;
   try {
     const res = await fetch('/api/admin/remove-member', {
@@ -1730,7 +1735,7 @@ function initGangSystems() {
     });
   });
 
-  document.querySelectorAll('.btn-clear-logs').forEach(btn => {
+  document.querySelectorAll('.btn-clear-logs, .btn-clear-feed').forEach(btn => {
     btn.addEventListener('click', () => {
       const logType = btn.getAttribute('data-logtype');
       clearAdminLogs(logType);
@@ -2114,8 +2119,8 @@ async function clearAdminLogs(logType) {
   const pin = getAdminPin();
   if (!pin) return;
 
-  const names = { delivery: 'ส่งของ', treasury: 'เงินแก๊ง', leave: 'ห้องลา', all: 'ทั้งหมด' };
-  if (!confirm(`⚠️ ยืนยันการล้างประวัติ${names[logType] || logType} บนหน้าเว็บไซต์?`)) return;
+  const names = { delivery: 'ส่งของ', treasury: 'เงินแก๊ง / กองกลาง', leave: 'ห้องลา', all: 'ทั้งหมด' };
+  if (!confirm(`⚠️ ยืนยันการล้างประวัติ${names[logType] || logType} บนหน้าเว็บไซต์หรือไม่?\n\n(ข้อมูลจะถูกล้างและรีเซ็ตยอดเงินทันที)`)) return;
 
   try {
     const res = await fetch('/api/gang-systems/admin/clear-logs', {
@@ -2126,13 +2131,19 @@ async function clearAdminLogs(logType) {
 
     const data = await res.json();
     if (res.ok && data.success) {
-      showToast('🗑️ ล้างประวัติเรียบร้อย');
+      showToast(`🗑️ ล้างประวัติ${names[logType] || logType} เรียบร้อยแล้ว`);
       if (logType === 'delivery' || logType === 'all') deliveryLogs = [];
-      if (logType === 'treasury' || logType === 'all') treasuryLogs = [];
+      if (logType === 'treasury' || logType === 'all') {
+        treasuryLogs = [];
+        const badge = document.getElementById('badgeTreasuryBalance');
+        const totalDisplay = document.getElementById('treasuryTotalDisplay');
+        if (badge) badge.textContent = '$0';
+        if (totalDisplay) totalDisplay.textContent = '$0';
+      }
       if (logType === 'leave' || logType === 'all') leaveLogs = [];
       renderGangSystemsAll();
     } else {
-      showToast(`❌ ${data.error || 'เกิดข้อผิดพลาด'}`);
+      showToast(`❌ ${data.error || 'รหัสผ่านไม่ถูกต้อง หรือเกิดข้อผิดพลาด'}`);
     }
   } catch (err) {
     showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');

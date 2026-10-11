@@ -304,7 +304,12 @@
             <div class="sys-card-title">
               <span class="title-icon">📋</span> ประวัติการส่งของแก๊งล่าสุด
             </div>
-            <span class="feed-live-tag">REAL-TIME</span>
+            <div class="feed-header-actions">
+              <span class="feed-live-tag">REAL-TIME</span>
+              <button type="button" class="btn-clear-feed" data-logtype="delivery" title="ล้างประวัติการส่งของ">
+                <span>🗑️</span> ล้างประวัติ
+              </button>
+            </div>
           </div>
           <div class="sys-feed-list" id="deliveryFeedList">
             <div class="feed-empty">กำลังโหลดข้อมูลประวัติการส่งของ...</div>
@@ -426,9 +431,14 @@
             <div class="sys-card-title">
               <span class="title-icon">💵</span> ประวัติรายการเงินแก๊ง / กองกลาง
             </div>
-            <div class="treasury-stat-box">
-              <span class="stat-lbl">ยอดเงินในระบบ:</span>
-              <span class="stat-val" id="treasuryTotalDisplay">$0</span>
+            <div class="feed-header-actions">
+              <div class="treasury-stat-box">
+                <span class="stat-lbl">ยอดเงินในระบบ:</span>
+                <span class="stat-val" id="treasuryTotalDisplay">$0</span>
+              </div>
+              <button type="button" class="btn-clear-feed" data-logtype="treasury" title="ล้างประวัติเงินกองกลาง">
+                <span>🗑️</span> ล้างประวัติ
+              </button>
             </div>
           </div>
           <div class="sys-feed-list" id="treasuryFeedList">
@@ -527,7 +537,12 @@
             <div class="sys-card-title">
               <span class="title-icon">📝</span> รายการแจ้งลาหยุดของสมาชิก
             </div>
-            <span class="feed-live-tag">STATUS</span>
+            <div class="feed-header-actions">
+              <span class="feed-live-tag">STATUS</span>
+              <button type="button" class="btn-clear-feed" data-logtype="leave" title="ล้างประวัติการแจ้งลา">
+                <span>🗑️</span> ล้างประวัติ
+              </button>
+            </div>
           </div>
           <div class="sys-feed-list" id="leaveFeedList">
             <div class="feed-empty">กำลังโหลดประวัติการแจ้งลา...</div>

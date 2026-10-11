@@ -2481,6 +2481,41 @@ body {
   color: var(--red-light);
 }
 
+.feed-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-clear-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(204, 0, 0, 0.12);
+  border: 1px solid rgba(204, 0, 0, 0.35);
+  border-radius: 16px;
+  color: #ff6b6b;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-clear-feed:hover {
+  background: rgba(204, 0, 0, 0.3);
+  border-color: var(--red);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(204, 0, 0, 0.35);
+}
+
+.btn-clear-feed:active {
+  transform: translateY(0);
+}
+
 .treasury-stat-box {
   display: flex;
   align-items: center;
