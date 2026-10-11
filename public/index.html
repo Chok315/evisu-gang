@@ -27,25 +27,7 @@
     <ul class="nav-links">
       <li><a href="#home" class="nav-link active" data-section="home">HOME</a></li>
       <li><a href="#tracker" class="nav-link" data-section="tracker">TRACKER</a></li>
-      <li class="nav-dropdown-wrap">
-        <a href="#gang-systems" class="nav-link nav-link-ops" data-section="gang-systems" id="opsNavLink">
-          OPERATIONS <span class="nav-chevron">▾</span>
-        </a>
-        <div class="nav-dropdown" id="opsDropdown">
-          <a href="#gang-systems" class="nav-drop-item nav-drop-delivery" data-systab="tab-delivery">
-            <span>📦</span>
-            <span>ส่งของแก๊ง</span>
-          </a>
-          <a href="#gang-systems" class="nav-drop-item nav-drop-treasury" data-systab="tab-treasury">
-            <span>💰</span>
-            <span>ส่งเงินแก๊ง</span>
-          </a>
-          <a href="#gang-systems" class="nav-drop-item nav-drop-leave" data-systab="tab-leave">
-            <span>📝</span>
-            <span>ห้องลา</span>
-          </a>
-        </div>
-      </li>
+      <li><a href="#gang-systems" class="nav-link" data-section="gang-systems">OPERATIONS</a></li>
       <li><a href="#members" class="nav-link" data-section="members">MEMBERS</a></li>
     </ul>
     <div class="nav-right">
@@ -187,6 +169,16 @@
 
   <!-- ── GANG SYSTEMS (OPERATIONS) SECTION ── -->
   <section id="gang-systems" class="section gang-systems-section">
+    <!-- Back Navigation Bar -->
+    <div class="sys-back-bar">
+      <a href="#home" class="btn-sys-back" data-section="home">
+        <span class="back-icon">←</span> ย้อนกลับหน้าหลัก
+      </a>
+      <a href="#tracker" class="btn-sys-back btn-sys-back-secondary" data-section="tracker">
+        <span>📡</span> ดู LIVE TRACKER
+      </a>
+    </div>
+
     <div class="section-header">
       <div class="section-tag">OPERATIONS & LOGISTICS</div>
       <h2 class="section-title">GANG SYSTEMS</h2>
@@ -225,14 +217,6 @@
             <span class="sys-status-pill" id="statusPillDelivery">
               <span class="pill-dot"></span> Discord Ready
             </span>
-          </div>
-
-          <!-- Quick switcher inside card -->
-          <div class="inner-sys-switcher">
-            <span class="inner-switcher-label">สลับเมนู:</span>
-            <button type="button" class="inner-tab-btn active" data-systab="tab-delivery">📦 ส่งของแก๊ง</button>
-            <button type="button" class="inner-tab-btn" data-systab="tab-treasury">💰 ส่งเงินแก๊ง</button>
-            <button type="button" class="inner-tab-btn" data-systab="tab-leave">📝 ห้องลา</button>
           </div>
 
           <form id="formDelivery" class="sys-form">
@@ -341,14 +325,6 @@
             <span class="sys-status-pill" id="statusPillTreasury">
               <span class="pill-dot"></span> Discord Ready
             </span>
-          </div>
-
-          <!-- Quick switcher inside card -->
-          <div class="inner-sys-switcher">
-            <span class="inner-switcher-label">สลับเมนู:</span>
-            <button type="button" class="inner-tab-btn" data-systab="tab-delivery">📦 ส่งของแก๊ง</button>
-            <button type="button" class="inner-tab-btn active" data-systab="tab-treasury">💰 ส่งเงินแก๊ง</button>
-            <button type="button" class="inner-tab-btn" data-systab="tab-leave">📝 ห้องลา</button>
           </div>
 
           <form id="formTreasury" class="sys-form">
@@ -474,14 +450,6 @@
             <span class="sys-status-pill" id="statusPillLeave">
               <span class="pill-dot"></span> Discord Ready
             </span>
-          </div>
-
-          <!-- Quick switcher inside card -->
-          <div class="inner-sys-switcher">
-            <span class="inner-switcher-label">สลับเมนู:</span>
-            <button type="button" class="inner-tab-btn" data-systab="tab-delivery">📦 ส่งของแก๊ง</button>
-            <button type="button" class="inner-tab-btn" data-systab="tab-treasury">💰 ส่งเงินแก๊ง</button>
-            <button type="button" class="inner-tab-btn active" data-systab="tab-leave">📝 ห้องลา</button>
           </div>
 
           <form id="formLeave" class="sys-form">

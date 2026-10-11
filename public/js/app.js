@@ -1329,7 +1329,58 @@ function switchGangSystemTab(targetId) {
   }
 }
 
+// ── LEVONA-Style Client-Side Discord Webhook Service ──────────
+const DiscordClientService = {
+  getAvatarUrl() {
+    return window.location.origin + '/img/evisu_logo.png?v=2';
+  },
+
+  async sendDirectWebhook(webhookUrl, embedPayload, content = '') {
+    if (!webhookUrl || !webhookUrl.startsWith('http')) {
+      return { success: false, message: 'URL Discord Webhook ไม่ถูกต้อง' };
+    }
+    const payload = {
+      username: 'EVISU GANG MANAGEMENT',
+      avatar_url: this.getAvatarUrl(),
+      content: content || undefined,
+      embeds: [embedPayload]
+    };
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok || response.status === 204) {
+        return { success: true, message: 'ส่งเข้า Discord Webhook สำเร็จ! 🎉' };
+      } else {
+        return { success: false, message: `Discord Webhook error (${response.status})` };
+      }
+    } catch (error) {
+      return { success: false, message: `ส่งเข้า Discord ไม่สำเร็จ: ${error.message}` };
+    }
+  }
+};
+
 function initGangSystems() {
+  // Back navigation buttons
+  document.querySelectorAll('.btn-sys-back').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const targetSec = btn.getAttribute('data-section') || 'home';
+      const secEl = document.getElementById(targetSec);
+      if (secEl) {
+        e.preventDefault();
+        secEl.scrollIntoView({ behavior: 'smooth' });
+        document.querySelectorAll('.nav-link').forEach(nl => {
+          if (nl.getAttribute('data-section') === targetSec) nl.classList.add('active');
+          else nl.classList.remove('active');
+        });
+        history.pushState(null, '', '#' + targetSec);
+      }
+    });
+  });
+
   // 1. Tab switching (top buttons and inner switcher buttons)
   document.querySelectorAll('.sys-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1483,7 +1534,18 @@ function initGangSystems() {
         if (data.discordResult && data.discordResult.success) {
           showToast(`📦 บันทึกการส่งของและส่งเข้า Discord สำเร็จ! (${data.discordResult.method})`);
         } else {
-          showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+          // LEVONA Direct Webhook Fallback
+          const directTarget = (customWebhook || '').trim() || data.targetWebhook || (discordConfig.delivery?.webhookUrl);
+          if (directTarget && directTarget.startsWith('http') && data.embedPayload) {
+            const directRes = await DiscordClientService.sendDirectWebhook(directTarget, data.embedPayload);
+            if (directRes.success) {
+              showToast(`📦 บันทึกการส่งของและส่งเข้า Discord สำเร็จเรียบร้อย! 🎉`);
+            } else {
+              showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${directRes.message || data.discordResult?.error}`);
+            }
+          } else {
+            showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+          }
         }
 
         // Reset inputs
@@ -1552,7 +1614,18 @@ function initGangSystems() {
         if (data.discordResult && data.discordResult.success) {
           showToast(`💰 บันทึกยอดเงิน ($${Number(amount).toLocaleString()}) และส่งเข้า Discord สำเร็จ!`);
         } else {
-          showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+          // LEVONA Direct Webhook Fallback
+          const directTarget = (customWebhook || '').trim() || data.targetWebhook || (discordConfig.treasury?.webhookUrl);
+          if (directTarget && directTarget.startsWith('http') && data.embedPayload) {
+            const directRes = await DiscordClientService.sendDirectWebhook(directTarget, data.embedPayload);
+            if (directRes.success) {
+              showToast(`💰 บันทึกส่งเงินแก๊ง ($${Number(amount).toLocaleString()}) และส่งเข้า Discord สำเร็จ! 🎉`);
+            } else {
+              showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${directRes.message || data.discordResult?.error}`);
+            }
+          } else {
+            showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+          }
         }
 
         const amtInput = document.getElementById('trAmount');
@@ -1618,7 +1691,18 @@ function initGangSystems() {
         if (data.discordResult && data.discordResult.success) {
           showToast(`📝 ส่งใบลาของ ${memberName} เข้า Discord สำเร็จ!`);
         } else {
-          showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+          // LEVONA Direct Webhook Fallback
+          const directTarget = (customWebhook || '').trim() || data.targetWebhook || (discordConfig.leave?.webhookUrl);
+          if (directTarget && directTarget.startsWith('http') && data.embedPayload) {
+            const directRes = await DiscordClientService.sendDirectWebhook(directTarget, data.embedPayload);
+            if (directRes.success) {
+              showToast(`📝 ส่งใบลาของ ${memberName} เข้า Discord สำเร็จเรียบร้อย! 🎉`);
+            } else {
+              showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${directRes.message || data.discordResult?.error}`);
+            }
+          } else {
+            showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+          }
         }
 
         const reasonInput = document.getElementById('lvReason');
@@ -2000,6 +2084,20 @@ async function testAdminDiscordConfig(sysKey, btn) {
     if (res.ok && data.success) {
       showToast(`🎉 ส่งข้อความทดสอบเข้า Discord สำเร็จ! (${data.method})`);
     } else {
+      // LEVONA Direct Webhook Fallback
+      if (webhookUrl && webhookUrl.startsWith('http')) {
+        const directRes = await DiscordClientService.sendDirectWebhook(webhookUrl, {
+          title: `🧪 ทดสอบการเชื่อมต่อ Discord | EVISU GANG`,
+          description: `ระบบ: **${sysKey.toUpperCase()}**\nสถานะ: **เชื่อมต่อสำเร็จผ่าน Webhook!**\nผู้ทดสอบ: **${currentUser ? currentUser.name : 'Admin EVISU'}**`,
+          color: 0xDC2626,
+          footer: { text: 'EVISU FIVEM GANG MANAGEMENT SYSTEM' },
+          timestamp: new Date().toISOString()
+        });
+        if (directRes.success) {
+          showToast('🎉 ส่งข้อความทดสอบเข้า Discord สำเร็จเรียบร้อย! (Direct Webhook) 🚀');
+          return;
+        }
+      }
       showToast(`❌ ทดสอบล้มเหลว: ${data.error || 'ไม่สามารถส่งเข้า Discord ได้'}`);
     }
   } catch (err) {

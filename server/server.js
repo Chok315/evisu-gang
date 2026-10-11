@@ -531,7 +531,9 @@ app.post('/api/gang-systems/delivery', async (req, res) => {
   res.json({
     success: true,
     log: newLog,
-    discordResult
+    discordResult,
+    embedPayload: embed,
+    targetWebhook
   });
 });
 
@@ -594,7 +596,9 @@ app.post('/api/gang-systems/treasury', async (req, res) => {
     success: true,
     log: newLog,
     totalBalance,
-    discordResult
+    discordResult,
+    embedPayload: embed,
+    targetWebhook
   });
 });
 
@@ -646,7 +650,9 @@ app.post('/api/gang-systems/leave', async (req, res) => {
   res.json({
     success: true,
     log: newLog,
-    discordResult
+    discordResult,
+    embedPayload: embed,
+    targetWebhook
   });
 });
 
