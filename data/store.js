@@ -44,6 +44,23 @@ const DATA_FILE = path.join(__dirname, 'gang_data.json');
 
 let gangMembers = [...defaultMembers];
 let gangRanks = [...defaultRanks];
+let discordConfig = {
+  delivery: {
+    webhookUrl: process.env.DISCORD_DELIVERY_WEBHOOK || '',
+    channelId: process.env.DISCORD_DELIVERY_CHANNEL_ID || ''
+  },
+  treasury: {
+    webhookUrl: process.env.DISCORD_TREASURY_WEBHOOK || '',
+    channelId: process.env.DISCORD_TREASURY_CHANNEL_ID || ''
+  },
+  leave: {
+    webhookUrl: process.env.DISCORD_LEAVE_WEBHOOK || '',
+    channelId: process.env.DISCORD_LEAVE_CHANNEL_ID || ''
+  }
+};
+let deliveryLogs = [];
+let treasuryLogs = [];
+let leaveLogs = [];
 
 function loadData() {
   try {
@@ -56,6 +73,25 @@ function loadData() {
       if (Array.isArray(parsed.ranks) && parsed.ranks.length > 0) {
         gangRanks = parsed.ranks;
       }
+      if (parsed.discordConfig && typeof parsed.discordConfig === 'object') {
+        discordConfig = {
+          delivery: {
+            webhookUrl: parsed.discordConfig.delivery?.webhookUrl || process.env.DISCORD_DELIVERY_WEBHOOK || '',
+            channelId: parsed.discordConfig.delivery?.channelId || process.env.DISCORD_DELIVERY_CHANNEL_ID || ''
+          },
+          treasury: {
+            webhookUrl: parsed.discordConfig.treasury?.webhookUrl || process.env.DISCORD_TREASURY_WEBHOOK || '',
+            channelId: parsed.discordConfig.treasury?.channelId || process.env.DISCORD_TREASURY_CHANNEL_ID || ''
+          },
+          leave: {
+            webhookUrl: parsed.discordConfig.leave?.webhookUrl || process.env.DISCORD_LEAVE_WEBHOOK || '',
+            channelId: parsed.discordConfig.leave?.channelId || process.env.DISCORD_LEAVE_CHANNEL_ID || ''
+          }
+        };
+      }
+      if (Array.isArray(parsed.deliveryLogs)) deliveryLogs = parsed.deliveryLogs;
+      if (Array.isArray(parsed.treasuryLogs)) treasuryLogs = parsed.treasuryLogs;
+      if (Array.isArray(parsed.leaveLogs)) leaveLogs = parsed.leaveLogs;
     } else {
       saveData();
     }
@@ -66,7 +102,22 @@ function loadData() {
 
 function saveData() {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ members: gangMembers, ranks: gangRanks }, null, 2), 'utf8');
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(
+        {
+          members: gangMembers,
+          ranks: gangRanks,
+          discordConfig,
+          deliveryLogs,
+          treasuryLogs,
+          leaveLogs
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
   } catch (err) {
     console.error('Error saving gang_data.json:', err.message);
   }
@@ -93,5 +144,10 @@ module.exports = {
   gangRanks,
   shops,
   ADMIN_PASSWORD,
+  discordConfig,
+  deliveryLogs,
+  treasuryLogs,
+  leaveLogs,
   saveData
 };
+

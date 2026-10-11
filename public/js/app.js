@@ -10,6 +10,16 @@ let membersData = [];
 let ranksData = [];
 let myCheckedShopId = null;
 
+// Gang Systems State
+let deliveryLogs = [];
+let treasuryLogs = [];
+let leaveLogs = [];
+let discordConfig = {
+  delivery: {},
+  treasury: {},
+  leave: {}
+};
+
 // User session
 let currentUser = null;
 let adminPin = null;
@@ -21,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initUserSession();
   initModals();
   initAdminPanel();
+  initGangSystems();
   initSocket();
   loadData();
 });
@@ -179,6 +190,7 @@ function updateUserUI() {
 
   // Update shop checkboxes
   renderShops();
+  syncGangSystemsMemberSelects();
 }
 
 function openLogoutConfirm() {
@@ -371,6 +383,8 @@ function initAdminPanel() {
         renderAdminMemberList();
       } else if (targetId === 'add-member-tab') {
         populateRankSelects();
+      } else if (targetId === 'discord-config-tab') {
+        loadAdminDiscordConfig();
       }
     });
   });
@@ -797,18 +811,60 @@ function initSocket() {
         if (data.gangMembers) {
           membersData = data.gangMembers;
           populateMemberSelect();
+          syncGangSystemsMemberSelects();
         }
+        if (Array.isArray(data.deliveryLogs)) deliveryLogs = data.deliveryLogs;
+        if (Array.isArray(data.treasuryLogs)) treasuryLogs = data.treasuryLogs;
+        if (Array.isArray(data.leaveLogs)) leaveLogs = data.leaveLogs;
+        if (data.discordConfig) discordConfig = data.discordConfig;
+
         syncMyCheckinState();
         renderAll();
+        renderGangSystemsAll();
       });
 
       socket.on('checkin_update', (event) => {
         handleCheckinEvent(event);
       });
 
+      socket.on('delivery_new', (log) => {
+        deliveryLogs.unshift(log);
+        if (deliveryLogs.length > 200) deliveryLogs.pop();
+        renderDeliveryFeed();
+        addActivityLog('in', `📦 <strong>${escapeHtml(log.senderName)}</strong> ส่งของ: ${escapeHtml(log.itemName)} (${escapeHtml(log.amount)})`);
+      });
+
+      socket.on('treasury_new', (log) => {
+        treasuryLogs.unshift(log);
+        if (treasuryLogs.length > 200) treasuryLogs.pop();
+        renderTreasuryFeed();
+        const action = log.type === 'deposit' ? 'ฝากเงิน' : 'เบิกเงิน';
+        addActivityLog(log.type === 'deposit' ? 'in' : 'out', `💰 <strong>${escapeHtml(log.userName)}</strong> ${action}: $${Number(log.amount).toLocaleString()}`);
+      });
+
+      socket.on('leave_new', (log) => {
+        leaveLogs.unshift(log);
+        if (leaveLogs.length > 200) leaveLogs.pop();
+        renderLeaveFeed();
+        addActivityLog('out', `📝 <strong>${escapeHtml(log.memberName)}</strong> ยื่นใบลา (${escapeHtml(log.leaveType)})`);
+      });
+
+      socket.on('discord_config_update', (newCfg) => {
+        discordConfig = newCfg;
+        updateDiscordStatusPills(newCfg);
+      });
+
+      socket.on('logs_cleared', ({ systemKey }) => {
+        if (systemKey === 'delivery' || systemKey === 'all') deliveryLogs = [];
+        if (systemKey === 'treasury' || systemKey === 'all') treasuryLogs = [];
+        if (systemKey === 'leave' || systemKey === 'all') leaveLogs = [];
+        renderGangSystemsAll();
+      });
+
       socket.on('members_update', (newMembers) => {
         membersData = newMembers;
         populateMemberSelect();
+        syncGangSystemsMemberSelects();
         renderMembers();
         renderAdminMemberList();
         renderAdminRanksList();
@@ -849,12 +905,13 @@ function syncMyCheckinState() {
 // ── Load Data via REST API ───────────────────────────────────
 async function loadData() {
   try {
-    const [sRes, cRes, mRes, rkRes, stRes] = await Promise.all([
+    const [sRes, cRes, mRes, rkRes, stRes, gsRes] = await Promise.all([
       fetch('/api/shops').then(r => r.json()).catch(() => []),
       fetch('/api/checkins').then(r => r.json()).catch(() => []),
       fetch('/api/members').then(r => r.json()).catch(() => []),
       fetch('/api/ranks').then(r => r.json()).catch(() => []),
-      fetch('/api/stats').then(r => r.json()).catch(() => null)
+      fetch('/api/stats').then(r => r.json()).catch(() => null),
+      fetch('/api/gang-systems/data').then(r => r.json()).catch(() => null)
     ]);
 
     if (Array.isArray(sRes) && sRes.length > 0) shopsData = sRes;
@@ -866,6 +923,15 @@ async function loadData() {
     if (Array.isArray(mRes)) {
       membersData = mRes;
       populateMemberSelect();
+      syncGangSystemsMemberSelects();
+    }
+
+    if (gsRes) {
+      if (Array.isArray(gsRes.deliveryLogs)) deliveryLogs = gsRes.deliveryLogs;
+      if (Array.isArray(gsRes.treasuryLogs)) treasuryLogs = gsRes.treasuryLogs;
+      if (Array.isArray(gsRes.leaveLogs)) leaveLogs = gsRes.leaveLogs;
+      if (gsRes.discordConfig) discordConfig = gsRes.discordConfig;
+      renderGangSystemsAll();
     }
 
     if (stRes) {
@@ -1209,3 +1275,693 @@ function showToast(message) {
     setTimeout(() => toast.remove(), 400);
   }, 2500);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// GANG SYSTEMS (DELIVERY / TREASURY / LEAVE) CLIENT LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+function initGangSystems() {
+  // 1. Tab switching
+  const tabBtns = document.querySelectorAll('.sys-tab-btn');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.system-tab-content').forEach(c => c.classList.remove('active'));
+
+      btn.classList.add('active');
+      const targetId = btn.getAttribute('data-systab');
+      document.getElementById(targetId)?.classList.add('active');
+    });
+  });
+
+  // 2. Treasury Type Selector (Deposit vs Withdraw)
+  const depositRadio = document.getElementById('labelDeposit');
+  const withdrawRadio = document.getElementById('labelWithdraw');
+  depositRadio?.addEventListener('click', () => {
+    depositRadio.classList.add('active');
+    withdrawRadio?.classList.remove('active');
+  });
+  withdrawRadio?.addEventListener('click', () => {
+    withdrawRadio.classList.add('active');
+    depositRadio?.classList.remove('active');
+  });
+
+  // 3. Quick Chips click handlers
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const targetId = chip.getAttribute('data-target');
+      const val = chip.getAttribute('data-val');
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.value = val;
+        target.focus();
+      }
+    });
+  });
+
+  document.querySelectorAll('.chip-money').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const targetId = chip.getAttribute('data-target');
+      const addVal = parseInt(chip.getAttribute('data-val')) || 0;
+      const target = document.getElementById(targetId);
+      if (target) {
+        const cur = parseInt(target.value) || 0;
+        target.value = cur + addVal;
+        target.focus();
+      }
+    });
+  });
+
+  // 4. Discord Override Accordions
+  document.querySelectorAll('.btn-toggle-override').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-target');
+      const box = document.getElementById(targetId);
+      const arrow = btn.querySelector('.toggle-arrow');
+      if (box) {
+        const isHidden = box.classList.contains('hidden');
+        if (isHidden) {
+          box.classList.remove('hidden');
+          if (arrow) arrow.style.transform = 'rotate(180deg)';
+        } else {
+          box.classList.add('hidden');
+          if (arrow) arrow.style.transform = 'rotate(0deg)';
+        }
+      }
+    });
+  });
+
+  // 5. Default dates for Leave Form
+  const startDateInput = document.getElementById('lvStartDate');
+  const endDateInput = document.getElementById('lvEndDate');
+  if (startDateInput && endDateInput) {
+    const today = new Date().toISOString().split('T')[0];
+    const after3Days = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+    startDateInput.value = today;
+    endDateInput.value = after3Days;
+  }
+
+  // 6. Form Submit: DELIVERY
+  const formDelivery = document.getElementById('formDelivery');
+  formDelivery?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitDelivery');
+    const senderName = document.getElementById('delSenderName')?.value;
+    const itemName = document.getElementById('delItemName')?.value;
+    const amount = document.getElementById('delAmount')?.value;
+    const location = document.getElementById('delLocation')?.value;
+    const imageUrl = document.getElementById('delImageUrl')?.value;
+    const note = document.getElementById('delNote')?.value;
+    const customWebhook = document.getElementById('delCustomWebhook')?.value;
+    const customChannelId = document.getElementById('delCustomChannelId')?.value;
+
+    if (!senderName) return showToast('❌ กรุณาเลือกชื่อสมาชิกผู้ส่งของ');
+    if (!itemName) return showToast('❌ กรุณาระบุรายการของหรือไอเทม');
+    if (!amount) return showToast('❌ กรุณาระบุจำนวนของที่ส่ง');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> กำลังบันทึกและส่งลง Discord...';
+    }
+
+    try {
+      const res = await fetch('/api/gang-systems/delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName,
+          itemName,
+          amount,
+          location,
+          imageUrl,
+          note,
+          customWebhook,
+          customChannelId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(`❌ ${data.error || 'เกิดข้อผิดพลาดในการบันทึก'}`);
+      } else {
+        if (data.discordResult && data.discordResult.success) {
+          showToast(`📦 บันทึกการส่งของและส่งเข้า Discord สำเร็จ! (${data.discordResult.method})`);
+        } else {
+          showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+        }
+
+        // Reset inputs
+        const itemInput = document.getElementById('delItemName');
+        const amountInput = document.getElementById('delAmount');
+        const imgInput = document.getElementById('delImageUrl');
+        const noteInput = document.getElementById('delNote');
+        if (itemInput) itemInput.value = '';
+        if (amountInput) amountInput.value = '';
+        if (imgInput) imgInput.value = '';
+        if (noteInput) noteInput.value = '';
+      }
+    } catch (err) {
+      showToast('❌ ข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span> บันทึกและส่งลง Discord';
+      }
+    }
+  });
+
+  // 7. Form Submit: TREASURY
+  const formTreasury = document.getElementById('formTreasury');
+  formTreasury?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitTreasury');
+    const type = document.querySelector('input[name="trType"]:checked')?.value || 'deposit';
+    const userName = document.getElementById('trUserName')?.value;
+    const amount = document.getElementById('trAmount')?.value;
+    const purpose = document.getElementById('trPurpose')?.value;
+    const imageUrl = document.getElementById('trImageUrl')?.value;
+    const note = document.getElementById('trNote')?.value;
+    const customWebhook = document.getElementById('trCustomWebhook')?.value;
+    const customChannelId = document.getElementById('trCustomChannelId')?.value;
+
+    if (!userName) return showToast('❌ กรุณาเลือกชื่อผู้ทำรายการ');
+    if (!amount || parseFloat(amount) <= 0) return showToast('❌ กรุณาระบุจำนวนเงินที่ถูกต้อง');
+    if (!purpose) return showToast('❌ กรุณาระบุวัตถุประสงค์');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> กำลังส่งเข้า Discord...';
+    }
+
+    try {
+      const res = await fetch('/api/gang-systems/treasury', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          userName,
+          amount,
+          purpose,
+          imageUrl,
+          note,
+          customWebhook,
+          customChannelId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(`❌ ${data.error || 'เกิดข้อผิดพลาดในการบันทึก'}`);
+      } else {
+        if (data.discordResult && data.discordResult.success) {
+          showToast(`💰 บันทึกยอดเงิน ($${Number(amount).toLocaleString()}) และส่งเข้า Discord สำเร็จ!`);
+        } else {
+          showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+        }
+
+        const amtInput = document.getElementById('trAmount');
+        const imgInput = document.getElementById('trImageUrl');
+        const noteInput = document.getElementById('trNote');
+        if (amtInput) amtInput.value = '';
+        if (imgInput) imgInput.value = '';
+        if (noteInput) noteInput.value = '';
+      }
+    } catch (err) {
+      showToast('❌ ข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span> บันทึกและส่งลง Discord';
+      }
+    }
+  });
+
+  // 8. Form Submit: LEAVE ROOM
+  const formLeave = document.getElementById('formLeave');
+  formLeave?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitLeave');
+    const memberName = document.getElementById('lvMemberName')?.value;
+    const leaveType = document.getElementById('lvLeaveType')?.value;
+    const startDate = document.getElementById('lvStartDate')?.value;
+    const endDate = document.getElementById('lvEndDate')?.value;
+    const reason = document.getElementById('lvReason')?.value;
+    const contact = document.getElementById('lvContact')?.value;
+    const customWebhook = document.getElementById('lvCustomWebhook')?.value;
+    const customChannelId = document.getElementById('lvCustomChannelId')?.value;
+
+    if (!memberName) return showToast('❌ กรุณาเลือกชื่อผู้ขอลา');
+    if (!startDate) return showToast('❌ กรุณาระบุวันที่เริ่มลา');
+    if (!reason) return showToast('❌ กรุณาระบุเหตุผลการลา');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> กำลังส่งใบลาเข้า Discord...';
+    }
+
+    try {
+      const res = await fetch('/api/gang-systems/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberName,
+          leaveType,
+          startDate,
+          endDate,
+          reason,
+          contact,
+          customWebhook,
+          customChannelId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(`❌ ${data.error || 'เกิดข้อผิดพลาดในการส่งใบลา'}`);
+      } else {
+        if (data.discordResult && data.discordResult.success) {
+          showToast(`📝 ส่งใบลาของ ${memberName} เข้า Discord สำเร็จ!`);
+        } else {
+          showToast(`⚠️ บันทึกในระบบแล้ว แต่ Discord: ${data.discordResult?.error || 'ไม่ได้ส่ง Discord'}`);
+        }
+
+        const reasonInput = document.getElementById('lvReason');
+        const contactInput = document.getElementById('lvContact');
+        if (reasonInput) reasonInput.value = '';
+        if (contactInput) contactInput.value = '';
+      }
+    } catch (err) {
+      showToast('❌ ข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span> ส่งใบลาและแจ้งลง Discord';
+      }
+    }
+  });
+
+  // Admin Discord Setting Buttons
+  document.getElementById('adminSaveDiscordCfgBtn')?.addEventListener('click', saveAdminDiscordConfig);
+
+  document.querySelectorAll('.btn-test-discord').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sysKey = btn.getAttribute('data-syskey');
+      testAdminDiscordConfig(sysKey, btn);
+    });
+  });
+
+  document.querySelectorAll('.btn-clear-logs').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const logType = btn.getAttribute('data-logtype');
+      clearAdminLogs(logType);
+    });
+  });
+}
+
+function syncGangSystemsMemberSelects() {
+  const selects = [
+    document.getElementById('delSenderName'),
+    document.getElementById('trUserName'),
+    document.getElementById('lvMemberName')
+  ];
+
+  selects.forEach(sel => {
+    if (!sel) return;
+    const curVal = sel.value;
+    sel.innerHTML = '<option value="">-- เลือกชื่อสมาชิก --</option>';
+
+    const sorted = [...membersData].sort((a, b) => (b.rankLevel || 0) - (a.rankLevel || 0));
+    sorted.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = `${m.name} (${m.rank || 'สมาชิก'})`;
+      sel.appendChild(opt);
+    });
+
+    if (currentUser && membersData.some(m => m.name === currentUser.name)) {
+      sel.value = currentUser.name;
+    } else if (curVal) {
+      sel.value = curVal;
+    }
+  });
+}
+
+function renderGangSystemsAll() {
+  syncGangSystemsMemberSelects();
+  renderDeliveryFeed();
+  renderTreasuryFeed();
+  renderLeaveFeed();
+  updateDiscordStatusPills();
+}
+
+function renderDeliveryFeed() {
+  const list = document.getElementById('deliveryFeedList');
+  const badge = document.getElementById('badgeDeliveryCount');
+  if (badge) badge.textContent = deliveryLogs.length;
+  if (!list) return;
+
+  if (!deliveryLogs || deliveryLogs.length === 0) {
+    list.innerHTML = `
+      <div class="feed-empty">
+        <span>📦</span>
+        <p>ยังไม่มีประวัติการส่งของ</p>
+        <small>กรอกแบบฟอร์มด้านซ้ายเพื่อส่งของและแจ้งเตือนเข้า Discord ได้เลย</small>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = deliveryLogs.slice(0, 30).map(item => {
+    const initial = (item.senderName || '?')[0].toUpperCase();
+    const time = item.date ? formatTimeAgo(item.date) : '';
+    const imgThumb = item.imageUrl
+      ? `<a href="${escapeHtml(item.imageUrl)}" target="_blank" rel="noopener" class="feed-thumb-link">🖼️ ดูรูปภาพสลิป/หลักฐาน</a>`
+      : '';
+    const noteLine = item.note ? `<div class="feed-note">"${escapeHtml(item.note)}"</div>` : '';
+
+    return `
+      <div class="feed-card delivery">
+        <div class="feed-top-row">
+          <div class="feed-user-wrap">
+            <div class="feed-avatar-dot">${initial}</div>
+            <span class="feed-name">${escapeHtml(item.senderName)}</span>
+          </div>
+          <span class="feed-time">${time}</span>
+        </div>
+        <div class="feed-main-info">
+          <span class="feed-item-title">📦 ${escapeHtml(item.itemName)}</span>
+          <span class="feed-amount-badge item">${escapeHtml(item.amount)}</span>
+        </div>
+        <div class="feed-sub-row">
+          <span class="feed-sub-tag">📍 ${escapeHtml(item.location || 'ตู้แก๊งใหญ่')}</span>
+        </div>
+        ${noteLine}
+        ${imgThumb}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTreasuryFeed() {
+  const list = document.getElementById('treasuryFeedList');
+  const badge = document.getElementById('badgeTreasuryBalance');
+  const totalDisplay = document.getElementById('treasuryTotalDisplay');
+
+  // Compute total balance
+  let balance = 0;
+  treasuryLogs.forEach(l => {
+    const amt = parseFloat(l.amount) || 0;
+    if (l.type === 'deposit') balance += amt;
+    else if (l.type === 'withdraw') balance -= amt;
+  });
+
+  const formattedBal = '$' + balance.toLocaleString('en-US');
+  if (badge) badge.textContent = formattedBal;
+  if (totalDisplay) totalDisplay.textContent = formattedBal;
+  if (!list) return;
+
+  if (!treasuryLogs || treasuryLogs.length === 0) {
+    list.innerHTML = `
+      <div class="feed-empty">
+        <span>💰</span>
+        <p>ยังไม่มีประวัติเงินกองกลาง</p>
+        <small>บันทึกการฝากหรือเบิกเงินด้านซ้ายเพื่อแจ้งเตือนเข้า Discord</small>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = treasuryLogs.slice(0, 30).map(item => {
+    const isDep = item.type === 'deposit';
+    const initial = (item.userName || '?')[0].toUpperCase();
+    const time = item.date ? formatTimeAgo(item.date) : '';
+    const amtStr = (isDep ? '+ $' : '- $') + (Number(item.amount) || 0).toLocaleString('en-US');
+    const imgThumb = item.imageUrl
+      ? `<a href="${escapeHtml(item.imageUrl)}" target="_blank" rel="noopener" class="feed-thumb-link">🖼️ ดูรูปสลิปโอน</a>`
+      : '';
+    const noteLine = item.note ? `<div class="feed-note">"${escapeHtml(item.note)}"</div>` : '';
+
+    return `
+      <div class="feed-card ${isDep ? 'deposit' : 'withdraw'}">
+        <div class="feed-top-row">
+          <div class="feed-user-wrap">
+            <div class="feed-avatar-dot" style="background: ${isDep ? '#27ae60' : '#c0392b'};">${initial}</div>
+            <span class="feed-name">${escapeHtml(item.userName)}</span>
+          </div>
+          <span class="feed-time">${time}</span>
+        </div>
+        <div class="feed-main-info">
+          <span class="feed-item-title">${isDep ? '🟢 ฝากเงินเข้าแก๊ง' : '🔴 เบิกเงินจากแก๊ง'}</span>
+          <span class="feed-amount-badge ${isDep ? 'deposit' : 'withdraw'}">${amtStr}</span>
+        </div>
+        <div class="feed-sub-row">
+          <span class="feed-sub-tag">📋 ${escapeHtml(item.purpose)}</span>
+        </div>
+        ${noteLine}
+        ${imgThumb}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderLeaveFeed() {
+  const list = document.getElementById('leaveFeedList');
+  const badge = document.getElementById('badgeLeaveCount');
+  if (badge) badge.textContent = leaveLogs.length;
+  if (!list) return;
+
+  if (!leaveLogs || leaveLogs.length === 0) {
+    list.innerHTML = `
+      <div class="feed-empty">
+        <span>📝</span>
+        <p>ยังไม่มีรายการแจ้งลาหยุด</p>
+        <small>กรอกแบบฟอร์มด้านซ้ายเพื่อแจ้งลาและส่งตรงเข้าห้องลาใน Discord</small>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = leaveLogs.slice(0, 30).map(item => {
+    const initial = (item.memberName || '?')[0].toUpperCase();
+    const time = item.date ? formatTimeAgo(item.date) : '';
+
+    return `
+      <div class="feed-card leave">
+        <div class="feed-top-row">
+          <div class="feed-user-wrap">
+            <div class="feed-avatar-dot" style="background: #2980b9;">${initial}</div>
+            <span class="feed-name">${escapeHtml(item.memberName)}</span>
+          </div>
+          <span class="feed-time">${time}</span>
+        </div>
+        <div class="feed-main-info">
+          <span class="feed-item-title">📋 ${escapeHtml(item.leaveType)}</span>
+          <span class="feed-amount-badge" style="color: #3498db; font-size: 0.78rem;">${escapeHtml(item.startDate)} → ${escapeHtml(item.endDate)}</span>
+        </div>
+        <div class="feed-sub-row">
+          <span class="feed-sub-tag">💬 เหตุผล: ${escapeHtml(item.reason)}</span>
+        </div>
+        ${item.contact ? `<div class="feed-sub-row" style="margin-top: 4px;"><span class="feed-sub-tag">📞 ติดต่อ: ${escapeHtml(item.contact)}</span></div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function updateDiscordStatusPills(cfg = discordConfig) {
+  const pills = {
+    delivery: document.getElementById('statusPillDelivery'),
+    treasury: document.getElementById('statusPillTreasury'),
+    leave: document.getElementById('statusPillLeave')
+  };
+
+  ['delivery', 'treasury', 'leave'].forEach(k => {
+    const pill = pills[k];
+    if (!pill) return;
+    const has = cfg && cfg[k] && (cfg[k].hasWebhook || cfg[k].webhookUrl || cfg[k].channelId);
+    if (has) {
+      pill.innerHTML = '<span class="pill-dot"></span> Discord Ready';
+      pill.style.color = '#2ecc71';
+      pill.style.borderColor = 'rgba(46, 204, 113, 0.3)';
+    } else {
+      pill.innerHTML = '<span class="pill-dot" style="background:#888;"></span> ใช้ค่าเริ่มต้น';
+      pill.style.color = 'var(--text-dim)';
+      pill.style.borderColor = 'var(--glass-border)';
+    }
+  });
+}
+
+function formatTimeAgo(isoStr) {
+  try {
+    const date = new Date(isoStr);
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+    if (diffSec < 60) return 'เมื่อสักครู่';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} นาทีที่แล้ว`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ชม. ที่แล้ว`;
+    return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+  } catch (e) {
+    return '';
+  }
+}
+
+// ── Admin Discord Config Actions ──────────────────────────────
+async function loadAdminDiscordConfig() {
+  try {
+    const pin = getAdminPin();
+    if (!pin) return;
+
+    const res = await fetch('/api/gang-systems/admin/get-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPin: pin })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success && data.discordConfig) {
+      const cfg = data.discordConfig;
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+
+      setVal('cfgDeliveryWebhook', cfg.delivery?.webhookUrl);
+      setVal('cfgDeliveryChannelId', cfg.delivery?.channelId);
+      setVal('cfgTreasuryWebhook', cfg.treasury?.webhookUrl);
+      setVal('cfgTreasuryChannelId', cfg.treasury?.channelId);
+      setVal('cfgLeaveWebhook', cfg.leave?.webhookUrl);
+      setVal('cfgLeaveChannelId', cfg.leave?.channelId);
+    }
+  } catch (err) {
+    console.error('Failed to load admin discord config:', err);
+  }
+}
+
+async function saveAdminDiscordConfig() {
+  const pin = getAdminPin();
+  if (!pin) return;
+
+  const btn = document.getElementById('adminSaveDiscordCfgBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '💾 กำลังบันทึกการตั้งค่า...';
+  }
+
+  const payload = {
+    adminPin: pin,
+    config: {
+      delivery: {
+        webhookUrl: document.getElementById('cfgDeliveryWebhook')?.value.trim() || '',
+        channelId: document.getElementById('cfgDeliveryChannelId')?.value.trim() || ''
+      },
+      treasury: {
+        webhookUrl: document.getElementById('cfgTreasuryWebhook')?.value.trim() || '',
+        channelId: document.getElementById('cfgTreasuryChannelId')?.value.trim() || ''
+      },
+      leave: {
+        webhookUrl: document.getElementById('cfgLeaveWebhook')?.value.trim() || '',
+        channelId: document.getElementById('cfgLeaveChannelId')?.value.trim() || ''
+      }
+    }
+  };
+
+  try {
+    const res = await fetch('/api/gang-systems/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast('✅ บันทึกการตั้งค่า Discord สำเร็จเรียบร้อย!');
+      discordConfig = data.discordConfig;
+      updateDiscordStatusPills(discordConfig);
+    } else {
+      showToast(`❌ ${data.error || 'บันทึกการตั้งค่าไม่สำเร็จ'}`);
+    }
+  } catch (err) {
+    showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '💾 บันทึกการตั้งค่า Discord ทั้งหมด';
+    }
+  }
+}
+
+async function testAdminDiscordConfig(sysKey, btn) {
+  const pin = getAdminPin();
+  if (!pin) return;
+
+  const webhookInputId = sysKey === 'delivery' ? 'cfgDeliveryWebhook' : (sysKey === 'treasury' ? 'cfgTreasuryWebhook' : 'cfgLeaveWebhook');
+  const channelInputId = sysKey === 'delivery' ? 'cfgDeliveryChannelId' : (sysKey === 'treasury' ? 'cfgTreasuryChannelId' : 'cfgLeaveChannelId');
+
+  const webhookUrl = document.getElementById(webhookInputId)?.value.trim() || '';
+  const channelId = document.getElementById(channelInputId)?.value.trim() || '';
+
+  if (!webhookUrl && !channelId) {
+    showToast('❌ กรุณาใส่ Webhook URL หรือ Channel ID ก่อนกดทดสอบ');
+    return;
+  }
+
+  const oldHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> กำลังทดสอบ...';
+  }
+
+  try {
+    const res = await fetch('/api/gang-systems/test-discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminPin: pin,
+        systemKey: sysKey,
+        webhookUrl,
+        channelId,
+        testerName: currentUser ? currentUser.name : 'Admin EVISU'
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast(`🎉 ส่งข้อความทดสอบเข้า Discord สำเร็จ! (${data.method})`);
+    } else {
+      showToast(`❌ ทดสอบล้มเหลว: ${data.error || 'ไม่สามารถส่งเข้า Discord ได้'}`);
+    }
+  } catch (err) {
+    showToast('❌ ข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = oldHtml;
+    }
+  }
+}
+
+async function clearAdminLogs(logType) {
+  const pin = getAdminPin();
+  if (!pin) return;
+
+  const names = { delivery: 'ส่งของ', treasury: 'เงินแก๊ง', leave: 'ห้องลา', all: 'ทั้งหมด' };
+  if (!confirm(`⚠️ ยืนยันการล้างประวัติ${names[logType] || logType} บนหน้าเว็บไซต์?`)) return;
+
+  try {
+    const res = await fetch('/api/gang-systems/admin/clear-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPin: pin, systemKey: logType })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast('🗑️ ล้างประวัติเรียบร้อย');
+      if (logType === 'delivery' || logType === 'all') deliveryLogs = [];
+      if (logType === 'treasury' || logType === 'all') treasuryLogs = [];
+      if (logType === 'leave' || logType === 'all') leaveLogs = [];
+      renderGangSystemsAll();
+    } else {
+      showToast(`❌ ${data.error || 'เกิดข้อผิดพลาด'}`);
+    }
+  } catch (err) {
+    showToast('❌ ข้อผิดพลาดในการเชื่อมต่อ');
+  }
+}
+

@@ -5,8 +5,27 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const {
+  activeCheckIns,
+  gangMembers,
+  gangRanks,
+  shops,
+  ADMIN_PASSWORD,
+  discordConfig,
+  deliveryLogs,
+  treasuryLogs,
+  leaveLogs,
+  saveData
+} = require('../data/store');
+
+const {
+  sendDiscordNotification,
+  buildDeliveryEmbed,
+  buildTreasuryEmbed,
+  buildLeaveEmbed,
+  buildTestEmbed
+} = require('./discordService');
 const path = require('path');
-const { activeCheckIns, gangMembers, gangRanks, shops, ADMIN_PASSWORD, saveData } = require('../data/store');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -373,6 +392,285 @@ app.post('/api/checkout', (req, res) => {
   res.json({ success: true });
 });
 
+// ── Gang Systems API (ส่งของแก๊ง / เงินแก๊ง / ห้องลา) ───────
+
+// GET Gang Systems Data
+app.get('/api/gang-systems/data', (req, res) => {
+  res.json({
+    discordConfig: {
+      delivery: {
+        hasWebhook: Boolean(discordConfig.delivery?.webhookUrl),
+        channelId: discordConfig.delivery?.channelId || '',
+        webhookUrl: discordConfig.delivery?.webhookUrl ? discordConfig.delivery.webhookUrl.replace(/(webhooks\/\d+\/)(.{4}).+(.{4})$/, '$1$2****$3') : ''
+      },
+      treasury: {
+        hasWebhook: Boolean(discordConfig.treasury?.webhookUrl),
+        channelId: discordConfig.treasury?.channelId || '',
+        webhookUrl: discordConfig.treasury?.webhookUrl ? discordConfig.treasury.webhookUrl.replace(/(webhooks\/\d+\/)(.{4}).+(.{4})$/, '$1$2****$3') : ''
+      },
+      leave: {
+        hasWebhook: Boolean(discordConfig.leave?.webhookUrl),
+        channelId: discordConfig.leave?.channelId || '',
+        webhookUrl: discordConfig.leave?.webhookUrl ? discordConfig.leave.webhookUrl.replace(/(webhooks\/\d+\/)(.{4}).+(.{4})$/, '$1$2****$3') : ''
+      }
+    },
+    deliveryLogs,
+    treasuryLogs,
+    leaveLogs
+  });
+});
+
+// Admin: GET Full Discord Config (includes full webhook URLs)
+app.post('/api/gang-systems/admin/get-config', (req, res) => {
+  const { adminPin } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+  res.json({ success: true, discordConfig });
+});
+
+// Admin: Save Discord Config
+app.post('/api/gang-systems/config', (req, res) => {
+  const { adminPin, config } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+  if (!config) return res.status(400).json({ error: 'Missing config payload' });
+
+  if (config.delivery) {
+    discordConfig.delivery.webhookUrl = (config.delivery.webhookUrl || '').trim();
+    discordConfig.delivery.channelId = (config.delivery.channelId || '').trim();
+  }
+  if (config.treasury) {
+    discordConfig.treasury.webhookUrl = (config.treasury.webhookUrl || '').trim();
+    discordConfig.treasury.channelId = (config.treasury.channelId || '').trim();
+  }
+  if (config.leave) {
+    discordConfig.leave.webhookUrl = (config.leave.webhookUrl || '').trim();
+    discordConfig.leave.channelId = (config.leave.channelId || '').trim();
+  }
+
+  saveData();
+  io.emit('discord_config_update', discordConfig);
+  console.log('[ADMIN DISCORD CONFIG UPDATED]');
+  res.json({ success: true, discordConfig });
+});
+
+// Admin: Test Discord Webhook / Channel ID
+app.post('/api/gang-systems/test-discord', async (req, res) => {
+  const { adminPin, systemKey, webhookUrl, channelId, testerName } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  const targetWebhook = (webhookUrl !== undefined && webhookUrl !== '') ? webhookUrl : discordConfig[systemKey]?.webhookUrl;
+  const targetChannel = (channelId !== undefined && channelId !== '') ? channelId : discordConfig[systemKey]?.channelId;
+
+  const titles = {
+    delivery: 'ระบบส่งของแก๊ง (DELIVERY)',
+    treasury: 'ระบบเงินแก๊ง (TREASURY)',
+    leave: 'ระบบห้องลา (LEAVE ROOM)'
+  };
+
+  const embed = buildTestEmbed({
+    systemName: titles[systemKey] || systemKey,
+    testerName: testerName || 'EVISU Admin'
+  });
+
+  const result = await sendDiscordNotification({
+    webhookUrl: targetWebhook,
+    channelId: targetChannel,
+    embedPayload: embed
+  });
+
+  res.json(result);
+});
+
+// POST Delivery (ระบบส่งของแก๊ง)
+app.post('/api/gang-systems/delivery', async (req, res) => {
+  const { senderName, itemName, amount, location, imageUrl, note, customWebhook, customChannelId } = req.body;
+  if (!senderName || !senderName.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุชื่อผู้ส่ง' });
+  }
+  if (!itemName || !itemName.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุรายการของหรือไอเทม' });
+  }
+  if (!amount || !String(amount).trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุจำนวนของที่ส่ง' });
+  }
+
+  const newLog = {
+    id: 'del_' + Date.now(),
+    date: new Date().toISOString(),
+    senderName: senderName.trim(),
+    itemName: itemName.trim(),
+    amount: String(amount).trim(),
+    location: (location || 'ตู้แก๊งใหญ่').trim(),
+    imageUrl: (imageUrl || '').trim(),
+    note: (note || '').trim()
+  };
+
+  deliveryLogs.unshift(newLog);
+  if (deliveryLogs.length > 200) deliveryLogs.pop();
+  saveData();
+
+  // Send to Discord
+  const targetWebhook = (customWebhook || '').trim() || discordConfig.delivery?.webhookUrl;
+  const targetChannel = (customChannelId || '').trim() || discordConfig.delivery?.channelId;
+
+  const embed = buildDeliveryEmbed(newLog);
+  const discordResult = await sendDiscordNotification({
+    webhookUrl: targetWebhook,
+    channelId: targetChannel,
+    embedPayload: embed
+  });
+
+  io.emit('delivery_new', newLog);
+  console.log(`[DELIVERY] ${newLog.senderName} ส่ง ${newLog.itemName} (${newLog.amount}) - Discord: ${discordResult.success ? 'OK' : discordResult.error}`);
+
+  res.json({
+    success: true,
+    log: newLog,
+    discordResult
+  });
+});
+
+// POST Treasury (ระบบเงินแก๊ง - ฝาก/เบิก)
+app.post('/api/gang-systems/treasury', async (req, res) => {
+  const { type, userName, amount, purpose, imageUrl, note, customWebhook, customChannelId } = req.body;
+  if (!type || (type !== 'deposit' && type !== 'withdraw')) {
+    return res.status(400).json({ error: 'กรุณาระบุประเภทรายการ (deposit หรือ withdraw)' });
+  }
+  if (!userName || !userName.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุชื่อผู้ทำรายการ' });
+  }
+  const cleanAmount = Number(String(amount).replace(/[^0-9.-]+/g, ''));
+  if (isNaN(cleanAmount) || cleanAmount <= 0) {
+    return res.status(400).json({ error: 'กรุณาระบุจำนวนเงินที่ถูกต้อง (มากกว่า 0)' });
+  }
+
+  // Calculate total balance from all logs
+  let totalBalance = cleanAmount * (type === 'deposit' ? 1 : -1);
+  treasuryLogs.forEach(l => {
+    const a = Number(String(l.amount).replace(/[^0-9.-]+/g, '')) || 0;
+    if (l.type === 'deposit') totalBalance += a;
+    else if (l.type === 'withdraw') totalBalance -= a;
+  });
+
+  const newLog = {
+    id: 'tr_' + Date.now(),
+    date: new Date().toISOString(),
+    type,
+    userName: userName.trim(),
+    amount: cleanAmount,
+    purpose: (purpose || (type === 'deposit' ? 'ฝากเงินเข้าแก๊ง' : 'เบิกเงินกองกลางแก๊ง')).trim(),
+    imageUrl: (imageUrl || '').trim(),
+    note: (note || '').trim()
+  };
+
+  treasuryLogs.unshift(newLog);
+  if (treasuryLogs.length > 200) treasuryLogs.pop();
+  saveData();
+
+  // Send to Discord
+  const targetWebhook = (customWebhook || '').trim() || discordConfig.treasury?.webhookUrl;
+  const targetChannel = (customChannelId || '').trim() || discordConfig.treasury?.channelId;
+
+  const embed = buildTreasuryEmbed({
+    ...newLog,
+    currentTotal: totalBalance
+  });
+
+  const discordResult = await sendDiscordNotification({
+    webhookUrl: targetWebhook,
+    channelId: targetChannel,
+    embedPayload: embed
+  });
+
+  io.emit('treasury_new', newLog);
+  console.log(`[TREASURY] ${newLog.type.toUpperCase()} by ${newLog.userName} ($${newLog.amount}) - Discord: ${discordResult.success ? 'OK' : discordResult.error}`);
+
+  res.json({
+    success: true,
+    log: newLog,
+    totalBalance,
+    discordResult
+  });
+});
+
+// POST Leave (ระบบห้องลา)
+app.post('/api/gang-systems/leave', async (req, res) => {
+  const { memberName, leaveType, startDate, endDate, reason, contact, customWebhook, customChannelId } = req.body;
+  if (!memberName || !memberName.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุชื่อผู้ขอลา' });
+  }
+  if (!leaveType || !leaveType.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุประเภทการลา' });
+  }
+  if (!startDate || !startDate.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุวันที่เริ่มลา' });
+  }
+  if (!reason || !reason.trim()) {
+    return res.status(400).json({ error: 'กรุณาระบุเหตุผลการลา' });
+  }
+
+  const newLog = {
+    id: 'lv_' + Date.now(),
+    date: new Date().toISOString(),
+    memberName: memberName.trim(),
+    leaveType: leaveType.trim(),
+    startDate: startDate.trim(),
+    endDate: (endDate || 'ยังไม่กำหนด').trim(),
+    reason: reason.trim(),
+    contact: (contact || '').trim()
+  };
+
+  leaveLogs.unshift(newLog);
+  if (leaveLogs.length > 200) leaveLogs.pop();
+  saveData();
+
+  // Send to Discord
+  const targetWebhook = (customWebhook || '').trim() || discordConfig.leave?.webhookUrl;
+  const targetChannel = (customChannelId || '').trim() || discordConfig.leave?.channelId;
+
+  const embed = buildLeaveEmbed(newLog);
+  const discordResult = await sendDiscordNotification({
+    webhookUrl: targetWebhook,
+    channelId: targetChannel,
+    embedPayload: embed
+  });
+
+  io.emit('leave_new', newLog);
+  console.log(`[LEAVE] ${newLog.memberName} (${newLog.leaveType}: ${newLog.startDate} - ${newLog.endDate}) - Discord: ${discordResult.success ? 'OK' : discordResult.error}`);
+
+  res.json({
+    success: true,
+    log: newLog,
+    discordResult
+  });
+});
+
+// Admin: Clear Logs
+app.post('/api/gang-systems/admin/clear-logs', (req, res) => {
+  const { adminPin, systemKey } = req.body;
+  if (adminPin !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'รหัสผ่านแอดมินไม่ถูกต้อง' });
+  }
+
+  if (systemKey === 'delivery') deliveryLogs.length = 0;
+  else if (systemKey === 'treasury') treasuryLogs.length = 0;
+  else if (systemKey === 'leave') leaveLogs.length = 0;
+  else if (systemKey === 'all') {
+    deliveryLogs.length = 0;
+    treasuryLogs.length = 0;
+    leaveLogs.length = 0;
+  }
+
+  saveData();
+  io.emit('logs_cleared', { systemKey });
+  res.json({ success: true });
+});
+
 // ── Socket.io ────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`[WS] Client connected: ${socket.id}`);
@@ -382,7 +680,29 @@ io.on('connection', (socket) => {
   activeCheckIns.forEach((checkin, userId) => {
     currentState.push({ userId, ...checkin });
   });
-  socket.emit('initial_state', { checkins: currentState, shops, gangMembers, ranks: gangRanks });
+  socket.emit('initial_state', {
+    checkins: currentState,
+    shops,
+    gangMembers,
+    ranks: gangRanks,
+    deliveryLogs: deliveryLogs.slice(0, 50),
+    treasuryLogs: treasuryLogs.slice(0, 50),
+    leaveLogs: leaveLogs.slice(0, 50),
+    discordConfig: {
+      delivery: {
+        hasWebhook: Boolean(discordConfig.delivery?.webhookUrl),
+        channelId: discordConfig.delivery?.channelId || ''
+      },
+      treasury: {
+        hasWebhook: Boolean(discordConfig.treasury?.webhookUrl),
+        channelId: discordConfig.treasury?.channelId || ''
+      },
+      leave: {
+        hasWebhook: Boolean(discordConfig.leave?.webhookUrl),
+        channelId: discordConfig.leave?.channelId || ''
+      }
+    }
+  });
 
   socket.on('disconnect', () => {
     console.log(`[WS] Client disconnected: ${socket.id}`);
