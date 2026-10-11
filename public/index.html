@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,10 +8,13 @@
   <meta name="description" content="EVISU Gang - FiveM Mafia Organization. Real-time shop tracker." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=Bebas+Neue&display=swap"
+    rel="stylesheet" />
   <link rel="icon" type="image/png" href="img/evisu_logo.png?v=2" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
+
 <body>
   <canvas id="particleCanvas"></canvas>
 
@@ -23,7 +27,25 @@
     <ul class="nav-links">
       <li><a href="#home" class="nav-link active" data-section="home">HOME</a></li>
       <li><a href="#tracker" class="nav-link" data-section="tracker">TRACKER</a></li>
-      <li><a href="#gang-systems" class="nav-link" data-section="gang-systems">OPERATIONS</a></li>
+      <li class="nav-dropdown-wrap">
+        <a href="#gang-systems" class="nav-link nav-link-ops" data-section="gang-systems" id="opsNavLink">
+          OPERATIONS <span class="nav-chevron">▾</span>
+        </a>
+        <div class="nav-dropdown" id="opsDropdown">
+          <a href="#gang-systems" class="nav-drop-item nav-drop-delivery" data-systab="tab-delivery">
+            <span>📦</span>
+            <span>ส่งของแก๊ง</span>
+          </a>
+          <a href="#gang-systems" class="nav-drop-item nav-drop-treasury" data-systab="tab-treasury">
+            <span>💰</span>
+            <span>ส่งเงินแก๊ง</span>
+          </a>
+          <a href="#gang-systems" class="nav-drop-item nav-drop-leave" data-systab="tab-leave">
+            <span>📝</span>
+            <span>ห้องลา</span>
+          </a>
+        </div>
+      </li>
       <li><a href="#members" class="nav-link" data-section="members">MEMBERS</a></li>
     </ul>
     <div class="nav-right">
@@ -76,6 +98,12 @@
       <div class="hero-cta">
         <a href="#tracker" class="btn-primary">
           <span>📡</span> LIVE TRACKER
+        </a>
+        <a href="#gang-systems" class="btn-hero-action btn-hero-delivery" data-systab="tab-delivery">
+          <span>📦</span> บันทึกส่งของ
+        </a>
+        <a href="#gang-systems" class="btn-hero-action btn-hero-treasury" data-systab="tab-treasury">
+          <span>💰</span> ส่งเงินแก๊ง
         </a>
         <button id="heroLoginBtn" class="btn-discord">
           <span>🔑</span> เข้าสู่ระบบด้วยชื่อ
@@ -162,7 +190,8 @@
     <div class="section-header">
       <div class="section-tag">OPERATIONS & LOGISTICS</div>
       <h2 class="section-title">GANG SYSTEMS</h2>
-      <p class="section-desc">ระบบส่งของแก๊ง • เงินกองกลาง • ห้องลา — ส่งตรงเข้าห้อง Discord ทันทีด้วย Webhooks & Channel IDs</p>
+      <p class="section-desc">ระบบส่งของแก๊ง • เงินกองกลาง • ห้องลา — ส่งตรงเข้าห้อง Discord ทันทีด้วย Webhooks &
+        Channel IDs</p>
     </div>
 
     <!-- System Tabs Navigation -->
@@ -174,7 +203,7 @@
       </button>
       <button class="sys-tab-btn" data-systab="tab-treasury">
         <span class="sys-tab-icon">💰</span>
-        <span class="sys-tab-text">เงินกองกลาง</span>
+        <span class="sys-tab-text">ส่งเงินแก๊ง / กองกลาง</span>
         <span class="sys-tab-badge" id="badgeTreasuryBalance">$0</span>
       </button>
       <button class="sys-tab-btn" data-systab="tab-leave">
@@ -198,6 +227,14 @@
             </span>
           </div>
 
+          <!-- Quick switcher inside card -->
+          <div class="inner-sys-switcher">
+            <span class="inner-switcher-label">สลับเมนู:</span>
+            <button type="button" class="inner-tab-btn active" data-systab="tab-delivery">📦 ส่งของแก๊ง</button>
+            <button type="button" class="inner-tab-btn" data-systab="tab-treasury">💰 ส่งเงินแก๊ง</button>
+            <button type="button" class="inner-tab-btn" data-systab="tab-leave">📝 ห้องลา</button>
+          </div>
+
           <form id="formDelivery" class="sys-form">
             <div class="form-group">
               <label for="delSenderName">👤 ชื่อสมาชิกผู้ส่งของ: <span class="req">*</span></label>
@@ -208,7 +245,8 @@
 
             <div class="form-group">
               <label for="delItemName">📦 รายการของ / ไอเทมที่ส่ง: <span class="req">*</span></label>
-              <input type="text" id="delItemName" class="form-input" placeholder="เช่น เหล็ก, ไม้, ปูน, กล่องดำ, กระสุน..." required />
+              <input type="text" id="delItemName" class="form-input"
+                placeholder="เช่น เหล็ก, ไม้, ปูน, กล่องดำ, กระสุน..." required />
               <!-- Quick Tag Chips -->
               <div class="quick-chips">
                 <span class="chip" data-target="delItemName" data-val="เหล็ก">เหล็ก</span>
@@ -231,22 +269,21 @@
                 <label for="delLocation">📍 จุดส่ง / ตู้เก็บของ:</label>
                 <select id="delLocation" class="form-select">
                   <option value="ตู้แก๊งใหญ่ EVISU">ตู้แก๊งใหญ่ EVISU</option>
-                  <option value="โกดังเซฟเฮาส์ EVISU">โกดังเซฟเฮาส์ EVISU</option>
-                  <option value="ตู้โรงงาน / จุดผลิต">ตู้โรงงาน / จุดผลิต</option>
-                  <option value="รถตู้เก็บของส่วนกลาง">รถตู้เก็บของส่วนกลาง</option>
-                  <option value="จุดส่งเฉพาะกิจ">จุดส่งเฉพาะกิจ</option>
                 </select>
               </div>
             </div>
 
             <div class="form-group">
-              <label for="delImageUrl">🖼️ ลิงก์รูปภาพสลิป / สกรีนช็อตส่งของ: <span class="optional">(ถ้ามี)</span></label>
-              <input type="url" id="delImageUrl" class="form-input" placeholder="https://i.imgur.com/... หรือ ลิงก์รูปภาพ Discord" />
+              <label for="delImageUrl">🖼️ ลิงก์รูปภาพสลิป / สกรีนช็อตส่งของ: <span
+                  class="optional">(ถ้ามี)</span></label>
+              <input type="url" id="delImageUrl" class="form-input"
+                placeholder="https://i.imgur.com/... หรือ ลิงก์รูปภาพ Discord" />
             </div>
 
             <div class="form-group">
               <label for="delNote">📝 บันทึกเพิ่มเติม / หมายเหตุ:</label>
-              <textarea id="delNote" class="form-textarea" rows="2" placeholder="เช่น ส่งครบตามยอดรายวัน, ของสำหรับวอร์คืนนี้..."></textarea>
+              <textarea id="delNote" class="form-textarea" rows="2"
+                placeholder="เช่น ส่งครบตามยอดรายวัน, ของสำหรับวอร์คืนนี้..."></textarea>
             </div>
 
             <!-- Discord Target Override (Collapsible) -->
@@ -256,14 +293,17 @@
                 <span class="toggle-arrow">▾</span>
               </button>
               <div id="delOverrideBox" class="override-box hidden">
-                <small class="override-hint">💡 หากเว้นว่างไว้ ระบบจะใช้ Webhook หรือ Channel ID ค่าเริ่มต้นของแก๊งที่แอดมินตั้งไว้</small>
+                <small class="override-hint">💡 หากเว้นว่างไว้ ระบบจะใช้ Webhook หรือ Channel ID
+                  ค่าเริ่มต้นของแก๊งที่แอดมินตั้งไว้</small>
                 <div class="form-group" style="margin-top: 8px;">
                   <label for="delCustomWebhook">🔗 Discord Webhook URL เฉพาะ:</label>
-                  <input type="text" id="delCustomWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/..." />
+                  <input type="text" id="delCustomWebhook" class="form-input"
+                    placeholder="https://discord.com/api/webhooks/..." />
                 </div>
                 <div class="form-group">
                   <label for="delCustomChannelId">🆔 Discord Channel ID เฉพาะ (สำหรับ Bot):</label>
-                  <input type="text" id="delCustomChannelId" class="form-input" placeholder="เช่น 1539262205088890921" />
+                  <input type="text" id="delCustomChannelId" class="form-input"
+                    placeholder="เช่น 1539262205088890921" />
                 </div>
               </div>
             </div>
@@ -296,11 +336,19 @@
         <div class="sys-card sys-form-card">
           <div class="sys-card-header">
             <div class="sys-card-title">
-              <span class="title-icon">💰</span> บันทึกเงินกองกลางแก๊ง (Treasury)
+              <span class="title-icon">💰</span> บันทึกการส่งเงินแก๊ง / กองกลาง (Treasury)
             </div>
             <span class="sys-status-pill" id="statusPillTreasury">
               <span class="pill-dot"></span> Discord Ready
             </span>
+          </div>
+
+          <!-- Quick switcher inside card -->
+          <div class="inner-sys-switcher">
+            <span class="inner-switcher-label">สลับเมนู:</span>
+            <button type="button" class="inner-tab-btn" data-systab="tab-delivery">📦 ส่งของแก๊ง</button>
+            <button type="button" class="inner-tab-btn active" data-systab="tab-treasury">💰 ส่งเงินแก๊ง</button>
+            <button type="button" class="inner-tab-btn" data-systab="tab-leave">📝 ห้องลา</button>
           </div>
 
           <form id="formTreasury" class="sys-form">
@@ -310,11 +358,11 @@
               <div class="treasury-type-selector">
                 <label class="type-btn-radio active" id="labelDeposit">
                   <input type="radio" name="trType" value="deposit" checked />
-                  <span>🟢 ฝากเงินเข้าแก๊ง (Deposit)</span>
+                  <span>🟢 ฝากเงินเข้าแก๊ง (ส่งเงินแก๊ง)</span>
                 </label>
                 <label class="type-btn-radio" id="labelWithdraw">
                   <input type="radio" name="trType" value="withdraw" />
-                  <span>🔴 เบิกเงินจากแก๊ง (Withdraw)</span>
+                  <span>🔴 เบิกเงินจากแก๊ง (เบิกงบ)</span>
                 </label>
               </div>
             </div>
@@ -328,7 +376,8 @@
 
             <div class="form-group">
               <label for="trAmount">💵 จำนวนเงิน ($ / THB): <span class="req">*</span></label>
-              <input type="number" id="trAmount" class="form-input" placeholder="เช่น 100000" min="1" step="any" required />
+              <input type="number" id="trAmount" class="form-input" placeholder="เช่น 100000" min="1" step="any"
+                required />
               <!-- Quick Amount Buttons -->
               <div class="quick-chips">
                 <span class="chip-money" data-target="trAmount" data-val="10000">+$10,000</span>
@@ -336,22 +385,36 @@
                 <span class="chip-money" data-target="trAmount" data-val="100000">+$100,000</span>
                 <span class="chip-money" data-target="trAmount" data-val="500000">+$500,000</span>
                 <span class="chip-money" data-target="trAmount" data-val="1000000">+$1,000,000</span>
+                <span class="chip-money" data-target="trAmount" data-val="5000000">+$5,000,000</span>
+                <span class="chip-clear" data-target="trAmount">🔄 ล้างยอด</span>
               </div>
             </div>
 
             <div class="form-group">
               <label for="trPurpose">📋 วัตถุประสงค์ / รายละเอียด: <span class="req">*</span></label>
-              <input type="text" id="trPurpose" class="form-input" placeholder="เช่น ภาษีแก๊งประจำสัปดาห์, ค่าน้ำมันรถ, เบิกซื้อยา/เกราะวอร์" required />
+              <input type="text" id="trPurpose" class="form-input"
+                placeholder="เช่น ภาษีแก๊งประจำสัปดาห์, สนับสนุนแก๊ง, ค่าน้ำมันรถ, ค่ายา..." required />
+              <!-- Quick Purpose Chips -->
+              <div class="quick-chips">
+                <span class="chip chip-purpose" data-target="trPurpose" data-val="ภาษีแก๊งประจำสัปดาห์">ภาษีแก๊งประจำสัปดาห์</span>
+                <span class="chip chip-purpose" data-target="trPurpose" data-val="เงินสนับสนุนแก๊ง">เงินสนับสนุนแก๊ง</span>
+                <span class="chip chip-purpose" data-target="trPurpose" data-val="ค่าน้ำมันรถแก๊ง">ค่าน้ำมันรถแก๊ง</span>
+                <span class="chip chip-purpose" data-target="trPurpose" data-val="ค่ายาและเกราะ">ค่ายาและเกราะ</span>
+                <span class="chip chip-purpose" data-target="trPurpose" data-val="งบวอร์ / ตีเมือง">งบวอร์ / ตีเมือง</span>
+                <span class="chip chip-purpose" data-target="trPurpose" data-val="ซื้ออาวุธและกระสุน">ซื้ออาวุธและกระสุน</span>
+              </div>
             </div>
 
             <div class="form-group">
               <label for="trImageUrl">🖼️ ลิงก์รูปภาพสลิปโอน / หลักฐาน: <span class="optional">(ถ้ามี)</span></label>
-              <input type="url" id="trImageUrl" class="form-input" placeholder="https://i.imgur.com/... หรือ ลิงก์รูปภาพ" />
+              <input type="url" id="trImageUrl" class="form-input"
+                placeholder="https://i.imgur.com/... หรือ ลิงก์รูปภาพ" />
             </div>
 
             <div class="form-group">
               <label for="trNote">📝 หมายเหตุเพิ่มเติม:</label>
-              <textarea id="trNote" class="form-textarea" rows="2" placeholder="รายละเอียดหรือบันทึกเสริม..."></textarea>
+              <textarea id="trNote" class="form-textarea" rows="2"
+                placeholder="รายละเอียดหรือบันทึกเสริม..."></textarea>
             </div>
 
             <!-- Discord Target Override -->
@@ -361,10 +424,12 @@
                 <span class="toggle-arrow">▾</span>
               </button>
               <div id="trOverrideBox" class="override-box hidden">
-                <small class="override-hint">💡 หากเว้นว่างไว้ ระบบจะใช้ Webhook หรือ Channel ID ค่าเริ่มต้นของแก๊งที่แอดมินตั้งไว้</small>
+                <small class="override-hint">💡 หากเว้นว่างไว้ ระบบจะใช้ Webhook หรือ Channel ID
+                  ค่าเริ่มต้นของแก๊งที่แอดมินตั้งไว้</small>
                 <div class="form-group" style="margin-top: 8px;">
                   <label for="trCustomWebhook">🔗 Discord Webhook URL เฉพาะ:</label>
-                  <input type="text" id="trCustomWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/..." />
+                  <input type="text" id="trCustomWebhook" class="form-input"
+                    placeholder="https://discord.com/api/webhooks/..." />
                 </div>
                 <div class="form-group">
                   <label for="trCustomChannelId">🆔 Discord Channel ID เฉพาะ (สำหรับ Bot):</label>
@@ -374,7 +439,7 @@
             </div>
 
             <button type="submit" id="btnSubmitTreasury" class="btn-submit-action btn-treasury">
-              <span>🚀</span> บันทึกและส่งลง Discord
+              <span>💰</span> บันทึกส่งเงินแก๊งและส่งลง Discord
             </button>
           </form>
         </div>
@@ -383,7 +448,7 @@
         <div class="sys-card sys-feed-card">
           <div class="sys-card-header">
             <div class="sys-card-title">
-              <span class="title-icon">💵</span> ประวัติรายการเงินกองกลาง
+              <span class="title-icon">💵</span> ประวัติรายการเงินแก๊ง / กองกลาง
             </div>
             <div class="treasury-stat-box">
               <span class="stat-lbl">ยอดเงินในระบบ:</span>
@@ -409,6 +474,14 @@
             <span class="sys-status-pill" id="statusPillLeave">
               <span class="pill-dot"></span> Discord Ready
             </span>
+          </div>
+
+          <!-- Quick switcher inside card -->
+          <div class="inner-sys-switcher">
+            <span class="inner-switcher-label">สลับเมนู:</span>
+            <button type="button" class="inner-tab-btn" data-systab="tab-delivery">📦 ส่งของแก๊ง</button>
+            <button type="button" class="inner-tab-btn" data-systab="tab-treasury">💰 ส่งเงินแก๊ง</button>
+            <button type="button" class="inner-tab-btn active" data-systab="tab-leave">📝 ห้องลา</button>
           </div>
 
           <form id="formLeave" class="sys-form">
@@ -444,7 +517,8 @@
 
             <div class="form-group">
               <label for="lvReason">💬 เหตุผลการลา: <span class="req">*</span></label>
-              <textarea id="lvReason" class="form-textarea" rows="2" placeholder="ระบุเหตุผลการลาอย่างย่อ เพื่อแจ้งหัวแก๊งและสมาชิก..." required></textarea>
+              <textarea id="lvReason" class="form-textarea" rows="2"
+                placeholder="ระบุเหตุผลการลาอย่างย่อ เพื่อแจ้งหัวแก๊งและสมาชิก..." required></textarea>
             </div>
 
             <div class="form-group">
@@ -459,10 +533,12 @@
                 <span class="toggle-arrow">▾</span>
               </button>
               <div id="lvOverrideBox" class="override-box hidden">
-                <small class="override-hint">💡 หากเว้นว่างไว้ ระบบจะใช้ Webhook หรือ Channel ID ค่าเริ่มต้นของแก๊งที่แอดมินตั้งไว้</small>
+                <small class="override-hint">💡 หากเว้นว่างไว้ ระบบจะใช้ Webhook หรือ Channel ID
+                  ค่าเริ่มต้นของแก๊งที่แอดมินตั้งไว้</small>
                 <div class="form-group" style="margin-top: 8px;">
                   <label for="lvCustomWebhook">🔗 Discord Webhook URL เฉพาะ:</label>
-                  <input type="text" id="lvCustomWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/..." />
+                  <input type="text" id="lvCustomWebhook" class="form-input"
+                    placeholder="https://discord.com/api/webhooks/..." />
                 </div>
                 <div class="form-group">
                   <label for="lvCustomChannelId">🆔 Discord Channel ID เฉพาะ (สำหรับ Bot):</label>
@@ -521,7 +597,7 @@
       </div>
       <div class="modal-body">
         <p class="modal-desc">เลือกชื่อของคุณจากรายชื่อสมาชิกในแก๊ง EVISU เพื่อเริ่มใช้งาน</p>
-        
+
         <div class="form-group">
           <label for="memberSelect">👤 เลือกรายชื่อสมาชิก:</label>
           <select id="memberSelect" class="form-select">
@@ -605,7 +681,8 @@
             <div class="admin-subcard-title">🎖️ เพิ่มยศใหม่สำหรับแก๊ง</div>
             <div class="form-group">
               <label for="newRankName">ชื่อยศใหม่:</label>
-              <input type="text" id="newRankName" class="form-input" placeholder="เช่น เสนาธิการ, ที่ปรึกษา, กัปตัน, มือปืน" />
+              <input type="text" id="newRankName" class="form-input"
+                placeholder="เช่น เสนาธิการ, ที่ปรึกษา, กัปตัน, มือปืน" />
             </div>
             <div class="form-row-2">
               <div class="form-group">
@@ -623,13 +700,20 @@
                 <div class="color-picker-wrap">
                   <input type="color" id="newRankColorPicker" value="#c9a84c" class="color-picker-native" />
                   <div class="color-presets" id="colorPresets">
-                    <button type="button" class="color-preset-dot active" data-color="#c9a84c" style="background:#c9a84c;" title="ทอง"></button>
-                    <button type="button" class="color-preset-dot" data-color="#cc0000" style="background:#cc0000;" title="แดง"></button>
-                    <button type="button" class="color-preset-dot" data-color="#e67e22" style="background:#e67e22;" title="ส้ม"></button>
-                    <button type="button" class="color-preset-dot" data-color="#9b59b6" style="background:#9b59b6;" title="ม่วง"></button>
-                    <button type="button" class="color-preset-dot" data-color="#2980b9" style="background:#2980b9;" title="น้ำเงิน"></button>
-                    <button type="button" class="color-preset-dot" data-color="#27ae60" style="background:#27ae60;" title="เขียว"></button>
-                    <button type="button" class="color-preset-dot" data-color="#95a5a6" style="background:#95a5a6;" title="เงิน/เทา"></button>
+                    <button type="button" class="color-preset-dot active" data-color="#c9a84c"
+                      style="background:#c9a84c;" title="ทอง"></button>
+                    <button type="button" class="color-preset-dot" data-color="#cc0000" style="background:#cc0000;"
+                      title="แดง"></button>
+                    <button type="button" class="color-preset-dot" data-color="#e67e22" style="background:#e67e22;"
+                      title="ส้ม"></button>
+                    <button type="button" class="color-preset-dot" data-color="#9b59b6" style="background:#9b59b6;"
+                      title="ม่วง"></button>
+                    <button type="button" class="color-preset-dot" data-color="#2980b9" style="background:#2980b9;"
+                      title="น้ำเงิน"></button>
+                    <button type="button" class="color-preset-dot" data-color="#27ae60" style="background:#27ae60;"
+                      title="เขียว"></button>
+                    <button type="button" class="color-preset-dot" data-color="#95a5a6" style="background:#95a5a6;"
+                      title="เงิน/เทา"></button>
                   </div>
                 </div>
               </div>
@@ -662,7 +746,8 @@
             <span>💡</span>
             <div>
               <strong>คำแนะนำการเชื่อมต่อ Discord:</strong>
-              <p>คุณสามารถตั้งค่า <b>Webhook URL</b> และ/หรือ <b>Channel ID</b> แยกสำหรับแต่ละระบบได้ทันที ข้อมูลจะถูกส่งเป็น Embed สีประจำแก๊ง EVISU ไปยังห้อง Discord นั้นโดยอัตโนมัติ!</p>
+              <p>คุณสามารถตั้งค่า <b>Webhook URL</b> และ/หรือ <b>Channel ID</b> แยกสำหรับแต่ละระบบได้ทันที
+                ข้อมูลจะถูกส่งเป็น Embed สีประจำแก๊ง EVISU ไปยังห้อง Discord นั้นโดยอัตโนมัติ!</p>
             </div>
           </div>
 
@@ -671,12 +756,14 @@
             <div class="admin-subcard-title">📦 1. ระบบส่งของแก๊ง (Delivery)</div>
             <div class="form-group">
               <label for="cfgDeliveryWebhook">🔗 Discord Webhook URL:</label>
-              <input type="text" id="cfgDeliveryWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/..." />
+              <input type="text" id="cfgDeliveryWebhook" class="form-input"
+                placeholder="https://discord.com/api/webhooks/..." />
             </div>
             <div class="form-row-2">
               <div class="form-group">
                 <label for="cfgDeliveryChannelId">🆔 Discord Channel ID (สำหรับ Bot):</label>
-                <input type="text" id="cfgDeliveryChannelId" class="form-input" placeholder="เช่น 1539262205088890921" />
+                <input type="text" id="cfgDeliveryChannelId" class="form-input"
+                  placeholder="เช่น 1539262205088890921" />
               </div>
               <div class="form-group" style="display: flex; align-items: flex-end;">
                 <button type="button" class="btn-test-discord" data-syskey="delivery">
@@ -691,12 +778,14 @@
             <div class="admin-subcard-title">💰 2. ระบบเงินแก๊ง (Treasury)</div>
             <div class="form-group">
               <label for="cfgTreasuryWebhook">🔗 Discord Webhook URL:</label>
-              <input type="text" id="cfgTreasuryWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/..." />
+              <input type="text" id="cfgTreasuryWebhook" class="form-input"
+                placeholder="https://discord.com/api/webhooks/..." />
             </div>
             <div class="form-row-2">
               <div class="form-group">
                 <label for="cfgTreasuryChannelId">🆔 Discord Channel ID (สำหรับ Bot):</label>
-                <input type="text" id="cfgTreasuryChannelId" class="form-input" placeholder="เช่น 1539262205088890921" />
+                <input type="text" id="cfgTreasuryChannelId" class="form-input"
+                  placeholder="เช่น 1539262205088890921" />
               </div>
               <div class="form-group" style="display: flex; align-items: flex-end;">
                 <button type="button" class="btn-test-discord" data-syskey="treasury">
@@ -711,7 +800,8 @@
             <div class="admin-subcard-title">📝 3. ระบบห้องลาสมาชิก (Leave Room)</div>
             <div class="form-group">
               <label for="cfgLeaveWebhook">🔗 Discord Webhook URL:</label>
-              <input type="text" id="cfgLeaveWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/..." />
+              <input type="text" id="cfgLeaveWebhook" class="form-input"
+                placeholder="https://discord.com/api/webhooks/..." />
             </div>
             <div class="form-row-2">
               <div class="form-group">
@@ -733,12 +823,17 @@
           <!-- Log clearing area -->
           <div class="admin-subcard" style="margin-top: 24px; border-color: rgba(204, 0, 0, 0.3);">
             <div class="admin-subcard-title" style="color: var(--red-light);">🗑️ จัดการประวัติบันทึกในเว็บไซต์</div>
-            <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px;">สามารถเคลียร์ประวัติเก่าที่แสดงบนหน้าเว็บได้ (ไม่ลบข้อความใน Discord)</p>
+            <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px;">
+              สามารถเคลียร์ประวัติเก่าที่แสดงบนหน้าเว็บได้ (ไม่ลบข้อความใน Discord)</p>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button type="button" class="btn-danger-small btn-clear-logs" data-logtype="delivery">ล้างประวัติส่งของ</button>
-              <button type="button" class="btn-danger-small btn-clear-logs" data-logtype="treasury">ล้างประวัติเงินแก๊ง</button>
-              <button type="button" class="btn-danger-small btn-clear-logs" data-logtype="leave">ล้างประวัติห้องลา</button>
-              <button type="button" class="btn-danger-small btn-clear-logs" data-logtype="all">ล้างประวัติทั้งหมด</button>
+              <button type="button" class="btn-danger-small btn-clear-logs"
+                data-logtype="delivery">ล้างประวัติส่งของ</button>
+              <button type="button" class="btn-danger-small btn-clear-logs"
+                data-logtype="treasury">ล้างประวัติเงินแก๊ง</button>
+              <button type="button" class="btn-danger-small btn-clear-logs"
+                data-logtype="leave">ล้างประวัติห้องลา</button>
+              <button type="button" class="btn-danger-small btn-clear-logs"
+                data-logtype="all">ล้างประวัติทั้งหมด</button>
             </div>
           </div>
         </div>
@@ -752,4 +847,5 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/app.js"></script>
 </body>
+
 </html>

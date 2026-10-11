@@ -423,6 +423,74 @@ body {
   transform: translateY(-2px);
 }
 
+/* ── Hero Action Quick Buttons ── */
+.btn-hero-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 1.5px;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: var(--transition);
+  font-family: var(--font-body);
+}
+
+.btn-hero-delivery {
+  background: rgba(46, 204, 113, 0.15);
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+
+.btn-hero-delivery:hover {
+  background: rgba(46, 204, 113, 0.3);
+  box-shadow: 0 0 18px rgba(46, 204, 113, 0.4);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+.btn-hero-treasury {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
+
+.btn-hero-treasury:hover {
+  background: rgba(201, 168, 76, 0.3);
+  box-shadow: 0 0 18px rgba(201, 168, 76, 0.4);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+/* ── Nav link colors for system links ── */
+.nav-link-delivery {
+  color: rgba(46, 204, 113, 0.7) !important;
+}
+.nav-link-delivery:hover, .nav-link-delivery.active {
+  color: #2ecc71 !important;
+  text-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+}
+
+.nav-link-treasury {
+  color: rgba(201, 168, 76, 0.7) !important;
+}
+.nav-link-treasury:hover, .nav-link-treasury.active {
+  color: var(--gold-light) !important;
+  text-shadow: 0 0 8px rgba(201, 168, 76, 0.5);
+}
+
+.nav-link-leave {
+  color: rgba(52, 152, 219, 0.7) !important;
+}
+.nav-link-leave:hover, .nav-link-leave.active {
+  color: #5dade2 !important;
+  text-shadow: 0 0 8px rgba(52, 152, 219, 0.5);
+}
+
 .hero-scroll-hint {
   position: absolute;
   bottom: 36px;
@@ -2159,6 +2227,88 @@ body {
   border-color: #e74c3c;
   color: #e74c3c;
   box-shadow: 0 0 15px rgba(231, 76, 60, 0.2);
+}
+
+/* ── Inner System Switcher (inside form cards) ── */
+.inner-sys-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+}
+
+.inner-switcher-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.inner-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.inner-tab-btn:hover {
+  border-color: rgba(201, 168, 76, 0.4);
+  color: var(--gold-light);
+}
+
+.inner-tab-btn.active {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: var(--gold);
+  color: var(--gold-light);
+  box-shadow: 0 0 10px rgba(201, 168, 76, 0.2);
+}
+
+/* ── Chip Clear Button ── */
+.chip-clear {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(231, 76, 60, 0.08);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+  border-radius: 14px;
+  font-size: 0.72rem;
+  color: #e74c3c;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.chip-clear:hover {
+  background: rgba(231, 76, 60, 0.2);
+  border-color: #e74c3c;
+  transform: translateY(-1px);
+}
+
+/* ── Purpose Chips (gold tint) ── */
+.chip-purpose {
+  background: rgba(201, 168, 76, 0.06) !important;
+  border-color: rgba(201, 168, 76, 0.15) !important;
+  color: var(--gold) !important;
+}
+
+.chip-purpose:hover {
+  background: rgba(201, 168, 76, 0.18) !important;
+  border-color: var(--gold) !important;
+  color: var(--gold-light) !important;
 }
 
 /* ── Discord Override Collapsible ── */

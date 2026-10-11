@@ -98,6 +98,21 @@ function initNavbar() {
     l.addEventListener('click', () => {
       links.forEach(x => x.classList.remove('active'));
       l.classList.add('active');
+
+      const systab = l.getAttribute('data-systab');
+      if (systab) {
+        switchGangSystemTab(systab);
+      }
+    });
+  });
+
+  // Hero action buttons
+  document.querySelectorAll('.btn-hero-action').forEach(b => {
+    b.addEventListener('click', () => {
+      const systab = b.getAttribute('data-systab');
+      if (systab) {
+        switchGangSystemTab(systab);
+      }
     });
   });
 }
@@ -1280,19 +1295,69 @@ function showToast(message) {
 // GANG SYSTEMS (DELIVERY / TREASURY / LEAVE) CLIENT LOGIC
 // ═══════════════════════════════════════════════════════════════
 
-function initGangSystems() {
-  // 1. Tab switching
-  const tabBtns = document.querySelectorAll('.sys-tab-btn');
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabBtns.forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.system-tab-content').forEach(c => c.classList.remove('active'));
+function switchGangSystemTab(targetId) {
+  if (!targetId) return;
 
-      btn.classList.add('active');
+  // 1. Update top system tab buttons
+  document.querySelectorAll('.sys-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-systab') === targetId);
+  });
+
+  // 2. Update inner tab buttons inside cards
+  document.querySelectorAll('.inner-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-systab') === targetId);
+  });
+
+  // 3. Update tab contents
+  document.querySelectorAll('.system-tab-content').forEach(c => {
+    c.classList.toggle('active', c.id === targetId);
+  });
+
+  // 4. Update navbar active state
+  document.querySelectorAll('.nav-link').forEach(l => {
+    if (l.getAttribute('data-systab') === targetId) {
+      l.classList.add('active');
+    } else if (l.getAttribute('data-systab')) {
+      l.classList.remove('active');
+    }
+  });
+
+  if (targetId === 'tab-treasury') {
+    setTimeout(() => {
+      document.getElementById('trAmount')?.focus();
+    }, 150);
+  }
+}
+
+function initGangSystems() {
+  // 1. Tab switching (top buttons and inner switcher buttons)
+  document.querySelectorAll('.sys-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
       const targetId = btn.getAttribute('data-systab');
-      document.getElementById(targetId)?.classList.add('active');
+      switchGangSystemTab(targetId);
     });
   });
+
+  document.querySelectorAll('.inner-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-systab');
+      switchGangSystemTab(targetId);
+    });
+  });
+
+  // Hash change detection (e.g. #treasury or #tab-treasury)
+  function checkHashTab() {
+    const hash = window.location.hash;
+    if (hash === '#tab-treasury' || hash === '#treasury' || hash === '#money') {
+      switchGangSystemTab('tab-treasury');
+    } else if (hash === '#tab-delivery' || hash === '#delivery') {
+      switchGangSystemTab('tab-delivery');
+    } else if (hash === '#tab-leave' || hash === '#leave') {
+      switchGangSystemTab('tab-leave');
+    }
+  }
+  checkHashTab();
+  window.addEventListener('hashchange', checkHashTab);
 
   // 2. Treasury Type Selector (Deposit vs Withdraw)
   const depositRadio = document.getElementById('labelDeposit');
@@ -1327,6 +1392,17 @@ function initGangSystems() {
       if (target) {
         const cur = parseInt(target.value) || 0;
         target.value = cur + addVal;
+        target.focus();
+      }
+    });
+  });
+
+  document.querySelectorAll('.chip-clear').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const targetId = chip.getAttribute('data-target');
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.value = '';
         target.focus();
       }
     });
@@ -1491,7 +1567,7 @@ function initGangSystems() {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<span>🚀</span> บันทึกและส่งลง Discord';
+        btn.innerHTML = '<span>💰</span> บันทึกส่งเงินแก๊งและส่งลง Discord';
       }
     }
   });

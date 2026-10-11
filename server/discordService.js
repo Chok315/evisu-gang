@@ -50,6 +50,22 @@ function toEmbedBuilder(embedJson) {
   return embed;
 }
 
+function sanitizeDiscordError(status, rawText) {
+  if (!rawText) return `Webhook error (${status})`;
+  if (rawText.includes('<!doctype') || rawText.includes('<html') || rawText.includes('Error 1015') || rawText.includes('rate limited')) {
+    return `Discord Webhook ติด Cloudflare Rate Limit (Error 1015 บน Cloud Host) - ระบบพยายามส่งต่อแต่ Discord บล็อก IP ชั่วคราว`;
+  }
+  try {
+    const parsed = JSON.parse(rawText);
+    if (parsed.message) return `Discord: ${parsed.message}`;
+    return `Discord error (${status}): ${JSON.stringify(parsed)}`;
+  } catch (e) {
+    const clean = rawText.replace(/<[^>]*>?/gm, '').trim();
+    const short = clean.length > 120 ? clean.slice(0, 120) + '...' : clean;
+    return `Webhook error (${status}): ${short}`;
+  }
+}
+
 /**
  * Main dispatcher: sends embed via Webhook and/or Bot Channel ID
  */
@@ -63,22 +79,16 @@ async function sendDiscordNotification({ webhookUrl, channelId, embedPayload, co
 
   // 1. Try sending via Webhook
   if (cleanWebhook && cleanWebhook.startsWith('http')) {
+    const body = {
+      username: 'EVISU GANG MANAGEMENT',
+      avatar_url: LOGO_URL,
+      content: content || undefined,
+      embeds: [embedPayload]
+    };
+
     try {
       let targetUrl = cleanWebhook;
-      // If thread ID might be required and not yet in query
-      if (cleanChannelId && !targetUrl.includes('thread_id=')) {
-        // If webhook URL ends with slash or params, handle accordingly
-        // (Only append thread_id if user specifically passed a thread channel ID)
-      }
-
-      const body = {
-        username: 'EVISU GANG MANAGEMENT',
-        avatar_url: LOGO_URL,
-        content: content || undefined,
-        embeds: [embedPayload]
-      };
-
-      const res = await fetch(targetUrl, {
+      let res = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -88,14 +98,37 @@ async function sendDiscordNotification({ webhookUrl, channelId, embedPayload, co
         webhookSuccess = true;
       } else {
         const text = await res.text().catch(() => '');
-        errors.push(`Webhook error (${res.status}): ${text}`);
+
+        // If rate limited or blocked by Cloudflare (Error 1015) on discord.com, auto-retry with Discord Proxy
+        if (targetUrl.includes('discord.com/api/webhooks/') && (res.status === 429 || res.status === 403 || text.includes('1015') || text.includes('Cloudflare'))) {
+          try {
+            const proxyUrl = targetUrl.replace('discord.com/api/webhooks/', 'webhook.lewisakura.moe/api/webhooks/');
+            const proxyRes = await fetch(proxyUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+
+            if (proxyRes.ok || proxyRes.status === 204) {
+              webhookSuccess = true;
+              return { success: true, method: 'webhook (proxy)', details: 'ส่งเข้า Discord ผ่าน Webhook Proxy สำเร็จ' };
+            } else {
+              const proxyText = await proxyRes.text().catch(() => '');
+              errors.push(sanitizeDiscordError(proxyRes.status, proxyText));
+            }
+          } catch (proxyErr) {
+            errors.push(`Webhook Proxy: ${proxyErr.message}`);
+          }
+        } else {
+          errors.push(sanitizeDiscordError(res.status, text));
+        }
       }
     } catch (err) {
       errors.push(`Webhook fetch failed: ${err.message}`);
     }
   }
 
-  // 2. If webhook succeeded, return early (no need to duplicate message unless wanted)
+  // 2. If webhook succeeded, return early
   if (webhookSuccess) {
     return { success: true, method: 'webhook', details: 'ส่งเข้า Discord ผ่าน Webhook สำเร็จ' };
   }
@@ -212,7 +245,7 @@ function buildTreasuryEmbed({ type, userName, amount, purpose, imageUrl, note, c
   }
 
   const embed = {
-    title: `💰 บันทึกเงินแก๊ง EVISU | ${isDeposit ? 'ฝากเงิน' : 'เบิกเงิน'}`,
+    title: `💰 ${isDeposit ? 'ส่งเงินแก๊ง / ฝากเงิน' : 'เบิกเงินแก๊ง'} | EVISU GANG TREASURY`,
     description: `**${userName}** ทำรายการ: **${actionText}** จำนวน **${formatMoney(amount)}**`,
     color,
     author: {
